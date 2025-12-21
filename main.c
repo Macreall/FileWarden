@@ -2,7 +2,6 @@
 #include <windows.h>
 #include <commctrl.h>
 #include <stdbool.h>
-
 #pragma comment(lib, "comctl32.lib")
 
 #define WM_TRAYICON (WM_USER + 1)
@@ -22,6 +21,9 @@ void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent);
 HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text);
 
 int running = 1;
+
+
+
 NOTIFYICONDATA nid;
 
 
@@ -69,8 +71,9 @@ DWORD WINAPI WatchFolder(LPVOID lpParam) {
 
                 if (fni->Action == FILE_ACTION_ADDED) {
                     WCHAR* fnCopy = _wcsdup(filename);
-                    PostMessage(hwndParent, WM_APP + 1, 0, (LPARAM)fnCopy);
-                    free(fnCopy);
+                    if (fnCopy != NULL) {
+                        PostMessage(hwndParent, WM_APP + 1, 0, (LPARAM)fnCopy);
+                    }
                 }
 
                 offset = fni->NextEntryOffset;
@@ -125,8 +128,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             static WCHAR buffer[256];
             wcsncpy_s(buffer, 256, filename, 255);
             buffer[255] = 0;
-            OpenPopupWindow(hwnd, buffer);
-            free(filename);
+            if (filename != NULL) {
+                OpenPopupWindow(hwnd, buffer);
+                free(filename);
+            }
         } break;
 
         case WM_TRAYICON:
@@ -205,7 +210,7 @@ void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent) {
         NULL
     );
 
-    HWND hTab = CreateWindowEx(
+    hTab = CreateWindowEx(
     0,
     WC_TABCONTROL,
     NULL,
@@ -242,6 +247,18 @@ void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent) {
     }
 }
 
+LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch(msg) {
+        case WM_CLOSE:
+        case WM_DESTROY:
+            DestroyWindow(hwnd);
+            break;
+        default:
+            return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+
 HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text) {
     const wchar_t CLASS_NAME[] = L"PopupWindowClass";
 
@@ -250,7 +267,7 @@ HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text) {
     if (!registered) {
         WNDCLASS wc;
         ZeroMemory(&wc, sizeof(wc));
-        wc.lpfnWndProc = DefWindowProc;
+        wc.lpfnWndProc = PopupWndProc;
         wc.hInstance = GetModuleHandle(NULL);
         wc.lpszClassName = CLASS_NAME;
         wc.hCursor = LoadCursor(NULL, IDC_ARROW);
@@ -343,7 +360,7 @@ int WINAPI WinMain(
     nid.uID = 1;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
-    wcscpy_s(nid.szTip, sizeof(nid.szTip), L"File Warden");
+    wcscpy_s(nid.szTip, sizeof(nid.szTip), L"Your Tooltip Text Here");
 
     Shell_NotifyIcon(NIM_ADD, &nid);
 
