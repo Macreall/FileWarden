@@ -1,10 +1,11 @@
 #define UNICODE
 #include <windows.h>
 #include <shellapi.h>
-#include <psapi.h>
-#include <stdio.h>
 #include <commctrl.h>
 #include <stdbool.h>
+#include <stdio.h>
+
+
 #pragma comment(lib, "comctl32.lib")
 
 #define WM_TRAYICON (WM_USER + 1)
@@ -18,17 +19,22 @@ HWND hTab = NULL;
 HWND hPagePC = NULL;
 HWND hPageApps = NULL;
 
+
+
 void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent);
 
 HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text);
 
+int running = 1;
 
 
-NOTIFYICONDATA nid = {};
+
+NOTIFYICONDATA nid;
+
 
 DWORD WINAPI WatchFolder(LPVOID lpParam) {
     HWND hwndParent = (HWND)lpParam;
-    LPCWSTR folderPath = L"C:\\watchfolder";
+    LPCWSTR folderPath = L"C:\\watch_folder";
 
     HANDLE hDir = CreateFileW(
         folderPath,
@@ -46,9 +52,9 @@ DWORD WINAPI WatchFolder(LPVOID lpParam) {
     }
 
     BYTE buffer[1024];
-    DWORD bytesReturned;
+    DWORD bytesReturned = 0;
 
-    while (1) {
+    while (running) {
         if (ReadDirectoryChangesW(
             hDir,
             buffer,
@@ -63,7 +69,7 @@ DWORD WINAPI WatchFolder(LPVOID lpParam) {
             do {
                 FILE_NOTIFY_INFORMATION* fni = (FILE_NOTIFY_INFORMATION*)(buffer + offset);
 
-                int len = fni->FileNameLength / sizeof(WCHAR);
+                unsigned long long const len = fni->FileNameLength / sizeof(WCHAR);
                 WCHAR filename[256] = {0};
                 wcsncpy_s(filename, 256, fni->FileName, len);
                 filename[len] = 0;
@@ -71,6 +77,7 @@ DWORD WINAPI WatchFolder(LPVOID lpParam) {
                 if (fni->Action == FILE_ACTION_ADDED) {
                     WCHAR* fnCopy = _wcsdup(filename);
                     PostMessage(hwndParent, WM_APP + 1, 0, (LPARAM)fnCopy);
+                    free(fnCopy);
                 }
 
                 offset = fni->NextEntryOffset;
@@ -121,11 +128,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
 
         case WM_APP + 1: {
-            LPCWSTR filename = (LPCWSTR)lParam;
+            WCHAR* filename = (WCHAR*)lParam;
             static WCHAR buffer[256];
             wcsncpy_s(buffer, 256, filename, 255);
             buffer[255] = 0;
             OpenPopupWindow(hwnd, buffer);
+            free(filename);
         } break;
 
         case WM_TRAYICON:
@@ -156,13 +164,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             case ID_TRAY_ABOUT:
                     MessageBox(hwnd, L"TrayApp v1.0", L"About", MB_OK);
                     break;
+            default: ;
             }
             break;
 
 
         case WM_DESTROY:
             Shell_NotifyIcon(NIM_DELETE, &nid);
-            DestroyIcon(nid.hIcon);
+            // DestroyIcon(nid.hIcon);
             hSettingsWnd = NULL;
             PostQuitMessage(0);
             break;
@@ -182,7 +191,8 @@ void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent) {
 
     const wchar_t CLASS_NAME[] = L"SettingsWindowClass";
 
-    WNDCLASS wc = {0};
+    WNDCLASS wc;
+    ZeroMemory(&wc, sizeof(wc));
     wc.lpfnWndProc = SettingsWndProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
@@ -245,7 +255,8 @@ HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text) {
 
     static bool registered = false;
     if (!registered) {
-        WNDCLASS wc = {};
+        WNDCLASS wc;
+        ZeroMemory(&wc, sizeof(wc));
         wc.lpfnWndProc = DefWindowProc;
         wc.hInstance = GetModuleHandle(NULL);
         wc.lpszClassName = CLASS_NAME;
@@ -305,7 +316,8 @@ int WINAPI WinMain(
 
 
 
-    WNDCLASS wc = {};
+    WNDCLASS wc;
+    ZeroMemory(&wc, sizeof(wc));
     wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = L"TrayAppClass";
@@ -332,21 +344,7 @@ int WINAPI WinMain(
     0,
     NULL
 );
-
-
-    HWND hSettingsWnd = CreateWindowEx(
-    0,
-    L"STATIC",
-    L"My Small Window",
-    WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
-    100, 100, 300, 150,
-    hwnd,
-    NULL,
-    hInstance,
-    NULL
-    );
-
-
+    ZeroMemory(&nid, sizeof(nid));
     nid.cbSize = sizeof(NOTIFYICONDATA);
     nid.hWnd = hwnd;
     nid.uID = 1;
@@ -364,3 +362,4 @@ int WINAPI WinMain(
 
     return 0;
 }
+
