@@ -1,10 +1,7 @@
 #define UNICODE
 #include <windows.h>
-#include <shellapi.h>
 #include <commctrl.h>
 #include <stdbool.h>
-#include <stdio.h>
-
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -22,13 +19,9 @@ HWND hPageApps = NULL;
 
 
 void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent);
-
 HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text);
 
 int running = 1;
-
-
-
 NOTIFYICONDATA nid;
 
 
