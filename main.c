@@ -350,7 +350,7 @@ int WINAPI WinMain(
     nid.uID = 1;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
-    wcscpy_s(nid.szTip, sizeof(nid.szTip), L"Your Tooltip Text Here");
+    wcscpy_s(nid.szTip, sizeof(nid.szTip), L"File Warden");
 
     Shell_NotifyIcon(NIM_ADD, &nid);
 
