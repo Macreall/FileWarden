@@ -23,6 +23,7 @@ HWND hPagePC = NULL;
 HWND hPageApps = NULL;
 HWND monthComboBox = NULL;
 HWND yearComboBox = NULL;
+HWND companiesComboBox = NULL;
 HWND hLabel1 = NULL;
 HWND hLabel2 = NULL;
 HWND hMonthLabel = NULL;
@@ -42,6 +43,8 @@ TCHAR* years[] = {
     TEXT("2024"), TEXT("2025"), TEXT("2026"), TEXT("2027"), TEXT("2028"),
     TEXT("2029"), TEXT("2030"),
 };
+
+TCHAR* companies[] = {TEXT("WorldPac"), TEXT("Autozone"), TEXT("O'Reillys")};
 
 
 
@@ -64,10 +67,12 @@ int g_CurrentPage = 0;
 int PAGE_COUNT = 3;
 
 
+
 bool IsFileSendReady(int currentPage) {
     int monthIndex = -1;
     int yearIndex = -1;
     TCHAR nameText[256] = {0};
+    TCHAR companiesNameText[256] = {0};
     TCHAR poText[256] = {0};
 
     switch (currentPage) {
@@ -85,7 +90,6 @@ bool IsFileSendReady(int currentPage) {
                    (yearIndex != CB_ERR);
 
         case 1:
-        case 2:
             if (nameBox)
                 GetWindowText(nameBox, nameText, 256);
 
@@ -97,13 +101,25 @@ bool IsFileSendReady(int currentPage) {
             return (wcslen(nameText) > 0) &&
                    (monthIndex != CB_ERR) &&
                    (yearIndex != CB_ERR);
+        case 2:
+            if (companiesComboBox)
+                GetWindowText(companiesComboBox, companiesNameText, 256);
+
+            if (monthComboBox)
+                monthIndex = (int)SendMessage(monthComboBox, CB_GETCURSEL, 0, 0);
+            if (yearComboBox)
+                yearIndex = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
+
+            return (wcslen(companiesNameText) > 0) &&
+                   (monthIndex != CB_ERR) &&
+                   (yearIndex != CB_ERR);
 
         default:
             return false;
     }
 }
 
-void GetAllPageValues(TCHAR* nameText, TCHAR* poText, TCHAR* monthText, TCHAR* yearText)
+void GetAllPageValues(TCHAR* nameText, TCHAR* poText, TCHAR* monthText, TCHAR* yearText, TCHAR* companiesText)
 {
     if (nameBox)
         GetWindowText(nameBox, nameText, 256);
@@ -116,6 +132,9 @@ void GetAllPageValues(TCHAR* nameText, TCHAR* poText, TCHAR* monthText, TCHAR* y
 
     if (yearComboBox)
         GetWindowText(yearComboBox, yearText, 256);
+
+    if (companiesComboBox)
+        GetWindowText(companiesComboBox, companiesText, 256);
 }
 
 
@@ -139,6 +158,8 @@ void SetPage(int newPage)
     ShowWindow(hMonthLabel, SW_HIDE);
     ShowWindow(hYearLabel, SW_HIDE);
     ShowWindow(hLabel2, SW_HIDE);
+    ShowWindow(companiesComboBox, SW_HIDE);
+
 
     switch (newPage)
     {
@@ -151,12 +172,15 @@ void SetPage(int newPage)
             SetWindowText(hLabel1, L"Customer's Name:");
             SetWindowText(hLabel2, L"PO Number:");
             ShowWindow(hLabel2, SW_SHOW);
+            ShowWindow(companiesComboBox, SW_HIDE);
             SendMessage(monthComboBox, CB_RESETCONTENT, 0, 0);
 
             SendMessage(yearComboBox, CB_RESETCONTENT, 0, 0);
             for (int i = 0; i < _countof(years); i++) {
                 SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
             }
+
+
             ShowWindow(hButton, SW_SHOW);
 
 
@@ -169,6 +193,8 @@ void SetPage(int newPage)
             ShowWindow(yearComboBox, SW_SHOW);
             ShowWindow(hMonthLabel, SW_SHOW);
             ShowWindow(hYearLabel, SW_SHOW);
+            ShowWindow(companiesComboBox, SW_HIDE);
+
             SetWindowText(hLabel1, L"Invoice Date");
 
 
@@ -180,6 +206,7 @@ void SetPage(int newPage)
             for (int i = 0; i < _countof(years); i++) {
                 SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
             }
+
             ShowWindow(hButton, SW_SHOW);
 
 
@@ -188,10 +215,11 @@ void SetPage(int newPage)
         case 2:
             ShowWindow(hPageApps, SW_SHOW);
             ShowWindow(monthComboBox, SW_SHOW);
-            ShowWindow(nameBox, SW_SHOW);
+            ShowWindow(nameBox, SW_HIDE);
             ShowWindow(yearComboBox, SW_SHOW);
             ShowWindow(hMonthLabel, SW_SHOW);
             ShowWindow(hYearLabel, SW_SHOW);
+            ShowWindow(companiesComboBox, SW_SHOW);
             SetWindowText(hLabel1, L"Companies Name:");
 
 
@@ -203,6 +231,11 @@ void SetPage(int newPage)
             for (int i = 0; i < _countof(years); i++) {
                 SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
             }
+            SendMessage(companiesComboBox, CB_RESETCONTENT, 0, 0);
+            for (int i = 0; i < _countof(companies); i++) {
+                SendMessage(companiesComboBox, CB_ADDSTRING, 0, (LPARAM)companies[i]);
+            }
+
             ShowWindow(hButton, SW_SHOW);
 
 
@@ -292,6 +325,17 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         case WM_DESTROY:
             hSettingsWnd = NULL;
             break;
+        case WM_NOTIFY:
+        {
+            LPNMHDR pnmh = (LPNMHDR)lParam;
+
+            if (pnmh->hwndFrom == hTab && pnmh->code == TCN_SELCHANGE)
+            {
+                int newPage = TabCtrl_GetCurSel(hTab);
+                SetPage(newPage);  
+            }
+        }
+            break;
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
                 case IDC_SAVE_BUTTON:
@@ -306,12 +350,13 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                     TCHAR po[256] = {0};
                     TCHAR month[256] = {0};
                     TCHAR year[256] = {0};
+                    TCHAR companiesText[256] = {0};
 
-                    GetAllPageValues(name, po, month, year);
+                    GetAllPageValues(name, po, month, year, companiesText);
 
 
                     wchar_t buf[1024];
-                    swprintf_s(buf, 1024, L"Name: %s\nPO: %s\nMonth: %s\nYear: %s", name, po, month, year);
+                    swprintf_s(buf, 1024, L"Name: %s\nPO: %s\nMonth: %s\nYear: %s\nCompany: %s", name, po, month, year, companiesText);
                     MessageBox(hwnd, buf, L"Current Values", MB_OK);
 
                     break;
@@ -367,6 +412,21 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                 TEXT(""),
                 CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP,
                 350,
+                70,
+                120,
+                300,
+                hwnd,
+                (HMENU)IDC_COMBOBOX_DATES,
+                ((LPCREATESTRUCT)lParam)->hInstance,
+                NULL
+
+            );
+
+            companiesComboBox = CreateWindow(
+                WC_COMBOBOX,
+                TEXT(""),
+                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VSCROLL | WS_TABSTOP,
+                50,
                 70,
                 120,
                 300,
