@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <commctrl.h>
 #include <stdbool.h>
+#include <stdio.h>
 #pragma comment(lib, "comctl32.lib")
 
 #define WM_TRAYICON (WM_USER + 1)
@@ -9,18 +10,224 @@
 #define ID_TRAY_SETTINGS  1002
 #define ID_TRAY_ABOUT     1003
 
+#define IDC_COMBOBOX_DATES 101
+#define IDC_SAVE_BUTTON 105
+
+
 HWND hSettingsWnd = NULL;
 HINSTANCE g_hInstance = NULL;
 HWND hTab = NULL;
 HWND hPagePC = NULL;
 HWND hPageApps = NULL;
+HWND monthComboBox = NULL;
+HWND yearComboBox = NULL;
+HWND hLabel1 = NULL;
+HWND hLabel2 = NULL;
+HWND hMonthLabel = NULL;
+HWND hYearLabel = NULL;
+HWND nameBox = NULL;
+HWND poBox = NULL;
+HWND hButton = NULL;
 
+TCHAR* months[] = {
+    TEXT("January"), TEXT("February"), TEXT("March"), TEXT("April"),
+    TEXT("May"), TEXT("June"), TEXT("July"), TEXT("August"), TEXT("September"),
+    TEXT("October"), TEXT("November"), TEXT("December"),
+};
+
+TCHAR* years[] = {
+    TEXT("2020"), TEXT("2021"), TEXT("2022"), TEXT("2023"),
+    TEXT("2024"), TEXT("2025"), TEXT("2026"), TEXT("2027"), TEXT("2028"),
+    TEXT("2029"), TEXT("2030"),
+};
+
+
+#include <io.h>
+
+void AttachConsoleAndRedirectIO() {
+    AllocConsole();
+
+    FILE* fp;
+    freopen_s(&fp, "CONOUT$", "w", stdout);
+    freopen_s(&fp, "CONOUT$", "w", stderr);
+    freopen_s(&fp, "CONIN$", "r", stdin);
+}
 
 
 void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent);
 HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text);
 
 int running = 1;
+
+int g_CurrentPage = 0;
+int PAGE_COUNT = 3;
+
+
+void GetSettingsText(TCHAR* nameBuffer, size_t nameSize,
+                     TCHAR* poBuffer, size_t poSize)
+{
+    if (nameBox)
+        GetWindowText(nameBox, nameBuffer, (int)nameSize);
+
+    if (poBox)
+        GetWindowText(poBox, poBuffer, (int)poSize);
+
+
+}
+
+
+bool IsFileSendReady(int currentPage) {
+    int monthIndex = -1;
+    int yearIndex = -1;
+    TCHAR nameText[256] = {0};
+    TCHAR poText[256] = {0};
+
+    switch (currentPage) {
+        case 0:
+            if (nameBox)
+                GetWindowText(nameBox, nameText, 256);
+            if (poBox)
+                GetWindowText(poBox, poText, 256);
+
+            if (yearComboBox)
+                yearIndex = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
+
+            return (wcslen(nameText) > 0) &&
+                   (wcslen(poText) > 0) &&
+                   (yearIndex != CB_ERR);
+
+        case 1:
+        case 2:
+            if (nameBox)
+                GetWindowText(nameBox, nameText, 256);
+
+            if (monthComboBox)
+                monthIndex = (int)SendMessage(monthComboBox, CB_GETCURSEL, 0, 0);
+            if (yearComboBox)
+                yearIndex = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
+
+            return (wcslen(nameText) > 0) &&
+                   (monthIndex != CB_ERR) &&
+                   (yearIndex != CB_ERR);
+
+        default:
+            return false;
+    }
+}
+
+void GetAllPageValues(TCHAR* nameText, TCHAR* poText, TCHAR* monthText, TCHAR* yearText)
+{
+    if (nameBox)
+        GetWindowText(nameBox, nameText, 256);
+
+    if (poBox)
+        GetWindowText(poBox, poText, 256);
+
+    if (monthComboBox)
+        GetWindowText(monthComboBox, monthText, 256);
+
+    if (yearComboBox)
+        GetWindowText(yearComboBox, yearText, 256);
+}
+
+
+
+void SetPage(int newPage)
+{
+    if (newPage < 0 || newPage >= PAGE_COUNT)
+        return;
+
+    g_CurrentPage = newPage;
+
+    if (hTab)
+        TabCtrl_SetCurSel(hTab, newPage);
+
+    ShowWindow(hPagePC, SW_HIDE);
+    ShowWindow(hPageApps, SW_HIDE);
+    ShowWindow(nameBox, SW_HIDE);
+    ShowWindow(poBox, SW_HIDE);
+    ShowWindow(monthComboBox, SW_HIDE);
+    ShowWindow(yearComboBox, SW_HIDE);
+    ShowWindow(hMonthLabel, SW_HIDE);
+    ShowWindow(hYearLabel, SW_HIDE);
+    ShowWindow(hLabel2, SW_HIDE);
+
+    switch (newPage)
+    {
+        case 0:
+            ShowWindow(hPagePC, SW_SHOW);
+            ShowWindow(nameBox, SW_SHOW);
+            ShowWindow(poBox, SW_SHOW);
+            ShowWindow(hYearLabel, SW_SHOW);
+            ShowWindow(yearComboBox, SW_SHOW);
+            SetWindowText(hLabel1, L"Customer's Name:");
+            SetWindowText(hLabel2, L"PO Number:");
+            ShowWindow(hLabel2, SW_SHOW);
+            SendMessage(monthComboBox, CB_RESETCONTENT, 0, 0);
+
+            SendMessage(yearComboBox, CB_RESETCONTENT, 0, 0);
+            for (int i = 0; i < _countof(years); i++) {
+                SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
+            }
+            ShowWindow(hButton, SW_SHOW);
+
+
+            break;
+
+        case 1:
+            ShowWindow(hPageApps, SW_SHOW);
+            ShowWindow(nameBox, SW_SHOW);
+            ShowWindow(monthComboBox, SW_SHOW);
+            ShowWindow(yearComboBox, SW_SHOW);
+            ShowWindow(hMonthLabel, SW_SHOW);
+            ShowWindow(hYearLabel, SW_SHOW);
+            SetWindowText(hLabel1, L"Invoice Date");
+
+
+            SendMessage(monthComboBox, CB_RESETCONTENT, 0, 0);
+            for (int i = 0; i < _countof(months); i++) {
+                SendMessage(monthComboBox, CB_ADDSTRING, 0, (LPARAM)months[i]);
+            }
+            SendMessage(yearComboBox, CB_RESETCONTENT, 0, 0);
+            for (int i = 0; i < _countof(years); i++) {
+                SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
+            }
+            ShowWindow(hButton, SW_SHOW);
+
+
+            break;
+
+        case 2:
+            ShowWindow(hPageApps, SW_SHOW);
+            ShowWindow(monthComboBox, SW_SHOW);
+            ShowWindow(nameBox, SW_SHOW);
+            ShowWindow(yearComboBox, SW_SHOW);
+            ShowWindow(hMonthLabel, SW_SHOW);
+            ShowWindow(hYearLabel, SW_SHOW);
+            SetWindowText(hLabel1, L"Companies Name:");
+
+
+            SendMessage(monthComboBox, CB_RESETCONTENT, 0, 0);
+            for (int i = 0; i < _countof(months); i++) {
+                SendMessage(monthComboBox, CB_ADDSTRING, 0, (LPARAM)months[i]);
+            }
+            SendMessage(yearComboBox, CB_RESETCONTENT, 0, 0);
+            for (int i = 0; i < _countof(years); i++) {
+                SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
+            }
+            ShowWindow(hButton, SW_SHOW);
+
+
+            break;
+        default: ;
+    }
+}
+
+
+
+
+
+
 
 
 
@@ -88,6 +295,8 @@ DWORD WINAPI WatchFolder(LPVOID lpParam) {
 
 
 LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    int currentPage = g_CurrentPage;
+
     switch (msg) {
         case WM_CLOSE:
             DestroyWindow(hwnd);
@@ -95,19 +304,182 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         case WM_DESTROY:
             hSettingsWnd = NULL;
             break;
+        case WM_COMMAND:
+            switch (LOWORD(wParam)) {
+                case IDC_SAVE_BUTTON:
 
-        case WM_NOTIFY:
-            if (((LPNMHDR)lParam)->code == TCN_SELCHANGE) {
-                int iPage = TabCtrl_GetCurSel(hTab);
 
-                if (iPage == 0) {
-                    ShowWindow(hPagePC, SW_SHOW);
-                    ShowWindow(hPageApps, SW_HIDE);
-                } else {
-                    ShowWindow(hPagePC, SW_HIDE);
-                    ShowWindow(hPageApps, SW_SHOW);
-                }
+                    if (!IsFileSendReady(currentPage)) {
+                        MessageBox(hwnd, L"Please fill in all required fields before sending.", L"Warning", MB_OK | MB_ICONWARNING);
+                        break;
+                    }
+
+                    TCHAR name[256] = {0};
+                    TCHAR po[256] = {0};
+                    TCHAR month[256] = {0};
+                    TCHAR year[256] = {0};
+
+                    GetAllPageValues(name, po, month, year);
+
+
+                    wchar_t buf[1024];
+                    swprintf_s(buf, 1024, L"Name: %s\nPO: %s\nMonth: %s\nYear: %s", name, po, month, year);
+                    MessageBox(hwnd, buf, L"Current Values", MB_OK);
+
+                    break;
+            default: ;
             }
+
+
+        case WM_ERASEBKGND:
+        {
+            HDC hdc = (HDC)wParam;
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            HBRUSH hBrush = CreateSolidBrush(RGB(148, 148, 148));
+            FillRect(hdc, &rc, hBrush);
+            DeleteObject(hBrush);
+            return 1;
+        }
+
+        case WM_CREATE:
+        {
+            HWND hButton = CreateWindow(
+                       L"BUTTON",
+                       L"Send",
+                       WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                       550,
+                       70,
+                       60,
+                       30,
+                       hwnd,
+                       (HMENU)IDC_SAVE_BUTTON,
+                       (HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
+                       NULL);
+
+
+
+            monthComboBox = CreateWindow(
+                WC_COMBOBOX,
+                TEXT(""),
+                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP,
+                350,
+                120,
+                120,
+                300,
+                hwnd,
+                (HMENU)IDC_COMBOBOX_DATES,
+                ((LPCREATESTRUCT)lParam)->hInstance,
+                NULL
+
+            );
+
+            yearComboBox = CreateWindow(
+                WC_COMBOBOX,
+                TEXT(""),
+                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP,
+                350,
+                70,
+                120,
+                300,
+                hwnd,
+                (HMENU)IDC_COMBOBOX_DATES,
+                ((LPCREATESTRUCT)lParam)->hInstance,
+                NULL
+
+            );
+
+
+            hLabel1 = CreateWindowEx(
+                0,
+                L"STATIC",
+                L"Customer's Name:",
+                WS_CHILD | WS_VISIBLE | SS_LEFT,
+                50, 50,
+                150, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+            hMonthLabel = CreateWindowEx(
+                0,
+                L"STATIC",
+                L"Current Month",
+                WS_CHILD | WS_VISIBLE | SS_LEFT,
+                350, 100,
+                150, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+            hYearLabel = CreateWindowEx(
+                0,
+                L"STATIC",
+                L"Current Year",
+                WS_CHILD | WS_VISIBLE | SS_LEFT,
+                350, 50,
+                150, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+            nameBox = CreateWindowEx(
+                0,
+                L"EDIT",
+                L"",
+                WS_CHILD | WS_VISIBLE | SS_LEFT | WS_TABSTOP,
+                50, 70,
+                220, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+            hLabel2 = CreateWindowEx(
+                0,
+                L"STATIC",
+                L"PO Number:",
+                WS_CHILD | WS_VISIBLE | SS_LEFT,
+                50, 100,
+                150, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+            poBox = CreateWindowEx(
+                0,
+                L"EDIT",
+                L"",
+                WS_CHILD | WS_VISIBLE | SS_LEFT | WS_TABSTOP,
+                50, 120,
+                220, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+
+
+            ShowWindow(monthComboBox, SW_HIDE);
+            ShowWindow(hMonthLabel, SW_HIDE);
+
+            ShowWindow(yearComboBox, SW_SHOW);
+            ShowWindow(hYearLabel, SW_SHOW);
+
+            ShowWindow(hButton, SW_SHOW);
+
+
+
+            SendMessage(yearComboBox, CB_RESETCONTENT, 0, 0);
+            for (int i = 0; i < _countof(years); i++) {
+                SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
+            }
+
+        }
             break;
         default:
             return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -151,6 +523,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             break;
 
+
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
             case ID_TRAY_EXIT:
@@ -162,6 +535,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             case ID_TRAY_ABOUT:
                     MessageBox(hwnd, L"TrayApp v1.0", L"About", MB_OK);
                     break;
+
             default: ;
             }
             break;
@@ -193,6 +567,7 @@ void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent) {
     ZeroMemory(&wc, sizeof(wc));
     wc.lpfnWndProc = SettingsWndProc;
     wc.hInstance = hInstance;
+    wc.hbrBackground = CreateSolidBrush(RGB(148, 148, 148));
     wc.lpszClassName = CLASS_NAME;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
@@ -214,8 +589,8 @@ void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent) {
     0,
     WC_TABCONTROL,
     NULL,
-    WS_CHILD | WS_VISIBLE,
-    5, 5, 700, 450,
+    WS_CHILD | WS_VISIBLE | WS_THICKFRAME | WS_BORDER,
+    10, 10, 672, 405,
     hSettingsWnd,
     (HMENU)4001,
     hInstance,
@@ -293,7 +668,7 @@ HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text) {
         0,
         L"STATIC",
         text,
-        WS_CHILD | WS_VISIBLE | SS_CENTER,
+        WS_CHILD | WS_VISIBLE | SS_CENTER | WS_TABSTOP,
         10, 10, 280, 80,
         hwnd,
         NULL,
@@ -316,7 +691,9 @@ int WINAPI WinMain(
 ) {
 
 
+    AttachConsoleAndRedirectIO();
 
+    printf("Console attached!\n");
 
     const wchar_t CLASS_NAME[] = L"TrayAppClass";
     g_hInstance = hInstance;
@@ -364,12 +741,51 @@ int WINAPI WinMain(
 
     Shell_NotifyIcon(NIM_ADD, &nid);
 
+
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    while (GetMessage(&msg, NULL, 0, 0))
+    {
+        if (hSettingsWnd && msg.hwnd &&
+            IsChild(hSettingsWnd, msg.hwnd) &&
+            msg.message == WM_KEYDOWN)
+        {
+            int iPage = TabCtrl_GetCurSel(hTab);
+
+
+
+
+
+            switch (msg.wParam)
+            {
+                case VK_LEFT:
+                    if (iPage > 0)
+                        TabCtrl_SetCurSel(hTab, iPage - 1);
+                        SetPage(g_CurrentPage - 1);
+                    continue;
+
+                case VK_RIGHT:
+                    if (iPage < 2)
+                        TabCtrl_SetCurSel(hTab, iPage + 1);
+                        SetPage(g_CurrentPage + 1);
+                    continue;
+
+                case VK_ESCAPE:
+                    DestroyWindow(hSettingsWnd);
+                    continue;
+
+
+                default: ;
+            }
+        }
+
+        HWND hDlg = hSettingsWnd ? hSettingsWnd : msg.hwnd;
+        if (!IsDialogMessage(hDlg, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
     }
 
-    return 0;
+    return (int)msg.wParam;
 }
 
