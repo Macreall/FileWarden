@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 #pragma comment(lib, "comctl32.lib")
+#include <io.h>
+
 
 #define WM_TRAYICON (WM_USER + 1)
 #define ID_TRAY_EXIT 1001
@@ -42,7 +44,6 @@ TCHAR* years[] = {
 };
 
 
-#include <io.h>
 
 void AttachConsoleAndRedirectIO() {
     AllocConsole();
@@ -61,19 +62,6 @@ int running = 1;
 
 int g_CurrentPage = 0;
 int PAGE_COUNT = 3;
-
-
-void GetSettingsText(TCHAR* nameBuffer, size_t nameSize,
-                     TCHAR* poBuffer, size_t poSize)
-{
-    if (nameBox)
-        GetWindowText(nameBox, nameBuffer, (int)nameSize);
-
-    if (poBox)
-        GetWindowText(poBox, poBuffer, (int)poSize);
-
-
-}
 
 
 bool IsFileSendReady(int currentPage) {
