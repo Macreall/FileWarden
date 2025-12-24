@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 #pragma comment(lib, "comctl32.lib")
-#include <io.h>
 
 
 #define WM_TRAYICON (WM_USER + 1)
@@ -48,15 +47,6 @@ TCHAR* years[] = {
 TCHAR* companies[] = {TEXT("WorldPac"), TEXT("Autozone"), TEXT("O'Reillys")};
 
 
-
-void AttachConsoleAndRedirectIO() {
-    AllocConsole();
-
-    FILE* fp;
-    freopen_s(&fp, "CONOUT$", "w", stdout);
-    freopen_s(&fp, "CONOUT$", "w", stderr);
-    freopen_s(&fp, "CONIN$", "r", stdin);
-}
 
 
 void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent);
@@ -147,8 +137,8 @@ void SetPage(int newPage)
 
     g_CurrentPage = newPage;
 
-    if (hSettingsTab)
-        TabCtrl_SetCurSel(hSettingsTab, newPage);
+    if (hPopupTab)
+        TabCtrl_SetCurSel(hPopupTab, newPage);
 
     ShowWindow(hPagePC, SW_HIDE);
     ShowWindow(hPageApps, SW_HIDE);
@@ -317,8 +307,6 @@ DWORD WINAPI WatchFolder(LPVOID lpParam) {
 
 
 LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    int currentPage = g_CurrentPage;
-
     switch (msg) {
         case WM_CLOSE:
             DestroyWindow(hwnd);
@@ -326,82 +314,6 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         case WM_DESTROY:
             hSettingsWnd = NULL;
             break;
-        case WM_KEYDOWN:
-        {
-            HWND hTab =
-                (hwnd == hSettingsWnd) ? hSettingsTab :
-                (hwnd == hPopupWnd)    ? hPopupTab    :
-                NULL;
-
-            if (!hTab)
-                break;
-
-            int page = TabCtrl_GetCurSel(hTab);
-
-            switch (wParam)
-            {
-                case VK_LEFT:
-                    if (page > 0) {
-                        TabCtrl_SetCurSel(hTab, page - 1);
-                        SetPage(page - 1);
-                    }
-                    return 0;
-
-                case VK_RIGHT:
-                    if (page < PAGE_COUNT - 1) {
-                        TabCtrl_SetCurSel(hTab, page + 1);
-                        SetPage(page + 1);
-                    }
-                    return 0;
-
-                case VK_ESCAPE:
-                    DestroyWindow(hwnd);
-                    return 0;
-                default: ;
-            }
-
-            break;
-        }
-
-
-        case WM_NOTIFY:
-        {
-            LPNMHDR pnmh = (LPNMHDR)lParam;
-
-            if (pnmh->hwndFrom == hSettingsTab && pnmh->code == TCN_SELCHANGE)
-            {
-                int newPage = TabCtrl_GetCurSel(hSettingsTab);
-                SetPage(newPage);
-            }
-        }
-            break;
-        case WM_COMMAND:
-            switch (LOWORD(wParam)) {
-                case IDC_SAVE_BUTTON:
-
-
-                    if (!IsFileSendReady(currentPage)) {
-                        MessageBox(hwnd, L"Please fill in all required fields before sending.", L"Warning", MB_OK | MB_ICONWARNING);
-                        break;
-                    }
-
-                    TCHAR name[256] = {0};
-                    TCHAR po[256] = {0};
-                    TCHAR month[256] = {0};
-                    TCHAR year[256] = {0};
-                    TCHAR companiesText[256] = {0};
-
-                    GetAllPageValues(name, po, month, year, companiesText);
-
-
-                    wchar_t buf[1024];
-                    swprintf_s(buf, 1024, L"Name: %s\nPO: %s\nMonth: %s\nYear: %s\nCompany: %s", name, po, month, year, companiesText);
-                    MessageBox(hwnd, buf, L"Current Values", MB_OK);
-
-                    break;
-            default: ;
-            }
-
 
         case WM_ERASEBKGND:
         {
@@ -671,33 +583,6 @@ void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent) {
         hInstance,
         NULL
     );
-
-    hSettingsTab = CreateWindowEx(
-    0,
-    WC_TABCONTROL,
-    NULL,
-    WS_CHILD | WS_VISIBLE | WS_THICKFRAME | WS_BORDER,
-    10, 10, 672, 405,
-    hSettingsWnd,
-    (HMENU)4001,
-    hInstance,
-    NULL
-);
-
-
-    TCITEM tie;
-    tie.mask = TCIF_TEXT;
-
-    tie.pszText = L"Job Tickets";
-    TabCtrl_InsertItem(hSettingsTab, 0, &tie);
-
-    tie.pszText = L"Invoices";
-    TabCtrl_InsertItem(hSettingsTab, 1, &tie);
-
-    tie.pszText = L"Parts Receipts";
-    TabCtrl_InsertItem(hSettingsTab, 2, &tie);
-
-
 
 
     if (hSettingsWnd) {
@@ -1049,9 +934,7 @@ int WINAPI WinMain(
 ) {
 
 
-    AttachConsoleAndRedirectIO();
 
-    printf("Console attached!\n");
 
     const wchar_t CLASS_NAME[] = L"TrayAppClass";
     g_hInstance = hInstance;
@@ -1107,7 +990,7 @@ int WINAPI WinMain(
         HWND activeTab = NULL;
 
         if (hSettingsWnd && msg.hwnd &&
-    (msg.hwnd == hSettingsWnd || IsChild(hSettingsWnd, msg.hwnd)))
+            (msg.hwnd == hSettingsWnd || IsChild(hSettingsWnd, msg.hwnd)))
         {
             ownerWnd = hSettingsWnd;
             activeTab = hSettingsTab;
