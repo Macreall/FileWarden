@@ -15,10 +15,11 @@
 #define IDC_COMBOBOX_DATES 101
 #define IDC_SAVE_BUTTON 105
 
-
+HWND hPopupTab = NULL;
+HWND hPopupWnd = NULL;
 HWND hSettingsWnd = NULL;
 HINSTANCE g_hInstance = NULL;
-HWND hTab = NULL;
+HWND hSettingsTab = NULL;
 HWND hPagePC = NULL;
 HWND hPageApps = NULL;
 HWND monthComboBox = NULL;
@@ -146,8 +147,8 @@ void SetPage(int newPage)
 
     g_CurrentPage = newPage;
 
-    if (hTab)
-        TabCtrl_SetCurSel(hTab, newPage);
+    if (hSettingsTab)
+        TabCtrl_SetCurSel(hSettingsTab, newPage);
 
     ShowWindow(hPagePC, SW_HIDE);
     ShowWindow(hPageApps, SW_HIDE);
@@ -325,14 +326,52 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         case WM_DESTROY:
             hSettingsWnd = NULL;
             break;
+        case WM_KEYDOWN:
+        {
+            HWND hTab =
+                (hwnd == hSettingsWnd) ? hSettingsTab :
+                (hwnd == hPopupWnd)    ? hPopupTab    :
+                NULL;
+
+            if (!hTab)
+                break;
+
+            int page = TabCtrl_GetCurSel(hTab);
+
+            switch (wParam)
+            {
+                case VK_LEFT:
+                    if (page > 0) {
+                        TabCtrl_SetCurSel(hTab, page - 1);
+                        SetPage(page - 1);
+                    }
+                    return 0;
+
+                case VK_RIGHT:
+                    if (page < PAGE_COUNT - 1) {
+                        TabCtrl_SetCurSel(hTab, page + 1);
+                        SetPage(page + 1);
+                    }
+                    return 0;
+
+                case VK_ESCAPE:
+                    DestroyWindow(hwnd);
+                    return 0;
+                default: ;
+            }
+
+            break;
+        }
+
+
         case WM_NOTIFY:
         {
             LPNMHDR pnmh = (LPNMHDR)lParam;
 
-            if (pnmh->hwndFrom == hTab && pnmh->code == TCN_SELCHANGE)
+            if (pnmh->hwndFrom == hSettingsTab && pnmh->code == TCN_SELCHANGE)
             {
-                int newPage = TabCtrl_GetCurSel(hTab);
-                SetPage(newPage);  
+                int newPage = TabCtrl_GetCurSel(hSettingsTab);
+                SetPage(newPage);
             }
         }
             break;
@@ -633,7 +672,7 @@ void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent) {
         NULL
     );
 
-    hTab = CreateWindowEx(
+    hSettingsTab = CreateWindowEx(
     0,
     WC_TABCONTROL,
     NULL,
@@ -650,13 +689,13 @@ void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent) {
     tie.mask = TCIF_TEXT;
 
     tie.pszText = L"Job Tickets";
-    TabCtrl_InsertItem(hTab, 0, &tie);
+    TabCtrl_InsertItem(hSettingsTab, 0, &tie);
 
     tie.pszText = L"Invoices";
-    TabCtrl_InsertItem(hTab, 1, &tie);
+    TabCtrl_InsertItem(hSettingsTab, 1, &tie);
 
     tie.pszText = L"Parts Receipts";
-    TabCtrl_InsertItem(hTab, 2, &tie);
+    TabCtrl_InsertItem(hSettingsTab, 2, &tie);
 
 
 
@@ -671,11 +710,256 @@ void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent) {
 }
 
 LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    int currentPage = g_CurrentPage;
     switch(msg) {
         case WM_CLOSE:
-        case WM_DESTROY:
             DestroyWindow(hwnd);
             break;
+        case WM_DESTROY:
+            hPopupWnd = NULL;
+            break;
+        case WM_KEYDOWN:
+        {
+            HWND hTab =
+                (hwnd == hSettingsWnd) ? hSettingsTab :
+                (hwnd == hPopupWnd)    ? hPopupTab    :
+                NULL;
+
+            if (!hTab)
+                break;
+
+            int page = TabCtrl_GetCurSel(hTab);
+
+            switch (wParam)
+            {
+                case VK_LEFT:
+                    if (page > 0) {
+                        TabCtrl_SetCurSel(hTab, page - 1);
+                        SetPage(page - 1);
+                    }
+                    return 0;
+
+                case VK_RIGHT:
+                    if (page < PAGE_COUNT - 1) {
+                        TabCtrl_SetCurSel(hTab, page + 1);
+                        SetPage(page + 1);
+                    }
+                    return 0;
+
+                case VK_ESCAPE:
+                    DestroyWindow(hwnd);
+                    return 0;
+                default: ;
+            }
+
+            break;
+        }
+
+        case WM_NOTIFY:
+        {
+            LPNMHDR pnmh = (LPNMHDR)lParam;
+
+            if (pnmh->hwndFrom == hPopupTab && pnmh->code == TCN_SELCHANGE)
+            {
+                int newPage = TabCtrl_GetCurSel(hPopupTab);
+                SetPage(newPage);
+            }
+        }
+            break;
+        case WM_COMMAND:
+            switch (LOWORD(wParam)) {
+                case IDC_SAVE_BUTTON:
+
+
+                    if (!IsFileSendReady(currentPage)) {
+                        MessageBox(hwnd, L"Please fill in all required fields before sending.", L"Warning", MB_OK | MB_ICONWARNING);
+                        break;
+                    }
+
+                    TCHAR name[256] = {0};
+                    TCHAR po[256] = {0};
+                    TCHAR month[256] = {0};
+                    TCHAR year[256] = {0};
+                    TCHAR companiesText[256] = {0};
+
+                    GetAllPageValues(name, po, month, year, companiesText);
+
+
+                    wchar_t buf[1024];
+                    swprintf_s(buf, 1024, L"Name: %s\nPO: %s\nMonth: %s\nYear: %s\nCompany: %s", name, po, month, year, companiesText);
+                    MessageBox(hwnd, buf, L"Current Values", MB_OK);
+
+                    break;
+            default: ;
+            }
+
+
+        case WM_ERASEBKGND:
+        {
+            HDC hdc = (HDC)wParam;
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            HBRUSH hBrush = CreateSolidBrush(RGB(148, 148, 148));
+            FillRect(hdc, &rc, hBrush);
+            DeleteObject(hBrush);
+            return 1;
+        }
+
+        case WM_CREATE:
+        {
+            HWND hButton = CreateWindow(
+                       L"BUTTON",
+                       L"Send",
+                       WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                       550,
+                       70,
+                       60,
+                       30,
+                       hwnd,
+                       (HMENU)IDC_SAVE_BUTTON,
+                       (HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
+                       NULL);
+
+
+
+            monthComboBox = CreateWindow(
+                WC_COMBOBOX,
+                TEXT(""),
+                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP,
+                350,
+                120,
+                120,
+                300,
+                hwnd,
+                (HMENU)IDC_COMBOBOX_DATES,
+                ((LPCREATESTRUCT)lParam)->hInstance,
+                NULL
+
+            );
+
+            yearComboBox = CreateWindow(
+                WC_COMBOBOX,
+                TEXT(""),
+                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP,
+                350,
+                70,
+                120,
+                300,
+                hwnd,
+                (HMENU)IDC_COMBOBOX_DATES,
+                ((LPCREATESTRUCT)lParam)->hInstance,
+                NULL
+
+            );
+
+            companiesComboBox = CreateWindow(
+                WC_COMBOBOX,
+                TEXT(""),
+                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VSCROLL | WS_TABSTOP,
+                50,
+                70,
+                120,
+                300,
+                hwnd,
+                (HMENU)IDC_COMBOBOX_DATES,
+                ((LPCREATESTRUCT)lParam)->hInstance,
+                NULL
+
+            );
+
+
+            hLabel1 = CreateWindowEx(
+                0,
+                L"STATIC",
+                L"Customer's Name:",
+                WS_CHILD | WS_VISIBLE | SS_LEFT,
+                50, 50,
+                150, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+            hMonthLabel = CreateWindowEx(
+                0,
+                L"STATIC",
+                L"Current Month",
+                WS_CHILD | WS_VISIBLE | SS_LEFT,
+                350, 100,
+                150, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+            hYearLabel = CreateWindowEx(
+                0,
+                L"STATIC",
+                L"Current Year",
+                WS_CHILD | WS_VISIBLE | SS_LEFT,
+                350, 50,
+                150, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+            nameBox = CreateWindowEx(
+                0,
+                L"EDIT",
+                L"",
+                WS_CHILD | WS_VISIBLE | SS_LEFT | WS_TABSTOP,
+                50, 70,
+                220, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+            hLabel2 = CreateWindowEx(
+                0,
+                L"STATIC",
+                L"PO Number:",
+                WS_CHILD | WS_VISIBLE | SS_LEFT,
+                50, 100,
+                150, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+            poBox = CreateWindowEx(
+                0,
+                L"EDIT",
+                L"",
+                WS_CHILD | WS_VISIBLE | SS_LEFT | WS_TABSTOP,
+                50, 120,
+                220, 20,
+                hwnd,
+                NULL,
+                GetModuleHandle(NULL),
+                NULL);
+
+
+
+            ShowWindow(monthComboBox, SW_HIDE);
+            ShowWindow(hMonthLabel, SW_HIDE);
+
+            ShowWindow(yearComboBox, SW_SHOW);
+            ShowWindow(hYearLabel, SW_SHOW);
+
+            ShowWindow(hButton, SW_SHOW);
+
+
+
+            SendMessage(yearComboBox, CB_RESETCONTENT, 0, 0);
+            for (int i = 0; i < _countof(years); i++) {
+                SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
+            }
+
+        }
+            break;
+
         default:
             return DefWindowProc(hwnd, msg, wParam, lParam);
     }
@@ -694,6 +978,7 @@ HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text) {
         wc.hInstance = GetModuleHandle(NULL);
         wc.lpszClassName = CLASS_NAME;
         wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+        wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
         RegisterClass(&wc);
         registered = true;
     }
@@ -703,28 +988,53 @@ HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text) {
     CLASS_NAME,
     L"New File Alert",
     WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
-    CW_USEDEFAULT, CW_USEDEFAULT, 300, 100,
+    400, 200, 700, 450,
+    hwndParent,
     NULL,
-    NULL,
-    GetModuleHandle(NULL),
+    g_hInstance,
     NULL
 );
 
-    ShowWindow(hwnd, SW_SHOW);
+    if (!hwnd) {
+        return NULL;
+    }
 
-    CreateWindowEx(
-        0,
-        L"STATIC",
-        text,
-        WS_CHILD | WS_VISIBLE | SS_CENTER | WS_TABSTOP,
-        10, 10, 280, 80,
-        hwnd,
-        NULL,
-        GetModuleHandle(NULL),
-        NULL
-    );
+    hPopupWnd = hwnd;
 
-    UpdateWindow(hwnd);
+
+    hPopupTab = CreateWindowEx(
+    0,
+    WC_TABCONTROL,
+    NULL,
+    WS_CHILD | WS_VISIBLE | WS_THICKFRAME | WS_BORDER,
+    10, 10, 672, 405,
+    hwnd,
+    (HMENU)4001,
+    NULL,
+    NULL
+);
+
+
+    TCITEM tie;
+    tie.mask = TCIF_TEXT;
+
+    tie.pszText = L"Job Tickets";
+    TabCtrl_InsertItem(hPopupTab, 0, &tie);
+
+    tie.pszText = L"Invoices";
+    TabCtrl_InsertItem(hPopupTab, 1, &tie);
+
+    tie.pszText = L"Parts Receipts";
+    TabCtrl_InsertItem(hPopupTab, 2, &tie);
+
+
+
+
+    if (PopupWndProc) {
+        ShowWindow(hwnd, SW_SHOW);
+        UpdateWindow(hwnd);
+    }
+
     return hwnd;
 }
 
@@ -793,40 +1103,51 @@ int WINAPI WinMain(
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0))
     {
+        HWND ownerWnd = NULL;
+        HWND activeTab = NULL;
+
         if (hSettingsWnd && msg.hwnd &&
-            IsChild(hSettingsWnd, msg.hwnd) &&
-            msg.message == WM_KEYDOWN)
+    (msg.hwnd == hSettingsWnd || IsChild(hSettingsWnd, msg.hwnd)))
         {
-            int iPage = TabCtrl_GetCurSel(hTab);
+            ownerWnd = hSettingsWnd;
+            activeTab = hSettingsTab;
+        }
+        else if (hPopupWnd && msg.hwnd &&
+            (msg.hwnd == hPopupWnd || IsChild(hPopupWnd, msg.hwnd)))
+        {
+            ownerWnd = hPopupWnd;
+            activeTab = hPopupTab;
+        }
 
 
-
-
+        if (ownerWnd && msg.message == WM_KEYDOWN)
+        {
+            int page = TabCtrl_GetCurSel(activeTab);
 
             switch (msg.wParam)
             {
                 case VK_LEFT:
-                    if (iPage > 0)
-                        TabCtrl_SetCurSel(hTab, iPage - 1);
-                        SetPage(g_CurrentPage - 1);
+                    if (page > 0) {
+                        TabCtrl_SetCurSel(activeTab, page - 1);
+                        SetPage(page - 1);
+                    }
                     continue;
 
                 case VK_RIGHT:
-                    if (iPage < 2)
-                        TabCtrl_SetCurSel(hTab, iPage + 1);
-                        SetPage(g_CurrentPage + 1);
+                    if (page < 2) {
+                        TabCtrl_SetCurSel(activeTab, page + 1);
+                        SetPage(page + 1);
+                    }
                     continue;
 
                 case VK_ESCAPE:
-                    DestroyWindow(hSettingsWnd);
+                    DestroyWindow(ownerWnd);
                     continue;
-
-
                 default: ;
             }
         }
 
-        HWND hDlg = hSettingsWnd ? hSettingsWnd : msg.hwnd;
+        HWND hDlg = ownerWnd ? ownerWnd : msg.hwnd;
         if (!IsDialogMessage(hDlg, &msg))
         {
             TranslateMessage(&msg);
