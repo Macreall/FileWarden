@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #pragma comment(lib, "comctl32.lib")
+#include <string.h>
 
 
 #define WM_TRAYICON (WM_USER + 1)
@@ -59,6 +60,139 @@ int PAGE_COUNT = 3;
 
 
 
+void SaveFile(int currentPage, wchar_t* nameText, wchar_t* poText, wchar_t* monthText, wchar_t* yearText, wchar_t* companiesText) {
+    wchar_t *oldFilename = L"C:\\watchFolder\\placeholder.pdf";
+
+    wchar_t destination[MAX_PATH] = L"C:\\Users\\12096\\DropBox\\Harrison's DropBox\\";
+
+    wchar_t filename[128] = L"";
+
+
+
+
+
+    switch (currentPage) {
+        case 0:
+            if (nameBox)
+                GetWindowText(nameBox, nameText, 256);
+
+            if (poBox)
+                GetWindowText(poBox, poText, 256);
+
+            if (yearComboBox)
+                GetWindowText(yearComboBox, yearText, 256);
+
+            wcscat_s(destination, MAX_PATH, yearText);
+            wcscat_s(destination, MAX_PATH, L"\\Job Tickets ");
+            wcscat_s(destination, MAX_PATH, yearText);
+
+            wcscat_s(filename, 128, nameText);
+            wcscat_s(filename, 128, L" #");
+            wcscat_s(filename, 128, poText);
+            wcscat_s(filename, 128, L".pdf");
+
+            wcscat_s(destination, MAX_PATH, L"\\"); 
+            wcscat_s(destination, MAX_PATH, filename);
+
+            if (GetFileAttributesW(oldFilename) == INVALID_FILE_ATTRIBUTES) {
+                MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
+            }
+
+
+            if (!MoveFileW(oldFilename, destination)) {
+                DWORD err = GetLastError();
+                wchar_t buf[256];
+                swprintf_s(buf, 256, L"Failed to move file to: %ls (Error %lu)", destination, err);
+                MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+            }
+
+            break; 
+
+
+
+
+
+        case 1:
+            if (nameBox)
+                GetWindowText(nameBox, nameText, 256);
+            if (monthComboBox)
+                GetWindowText(monthComboBox, monthText, 256);
+
+            if (yearComboBox)
+                GetWindowText(yearComboBox, yearText, 256);
+
+            wcscat_s(destination, MAX_PATH, yearText);
+            wcscat_s(destination, MAX_PATH, L"\\Invoices ");
+            wcscat_s(destination, MAX_PATH, yearText);
+            wcscat_s(destination, MAX_PATH, L"\\");
+            wcscat_s(destination, MAX_PATH, monthText);
+
+
+            wcscat_s(filename, 128, nameText);
+            wcscat_s(filename, 128, L".pdf");
+
+            wcscat_s(destination, MAX_PATH, L"\\");
+            wcscat_s(destination, MAX_PATH, filename);
+
+            if (GetFileAttributesW(oldFilename) == INVALID_FILE_ATTRIBUTES) {
+                MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
+            }
+
+
+            if (!MoveFileW(oldFilename, destination)) {
+                DWORD err = GetLastError();
+                wchar_t buf[256];
+                swprintf_s(buf, 256, L"Failed to move file to: %ls (Error %lu)", destination, err);
+                MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+            }
+
+            break;
+
+
+
+        case 2:
+            if (monthComboBox)
+                GetWindowText(monthComboBox, monthText, 256);
+
+            if (yearComboBox)
+                GetWindowText(yearComboBox, yearText, 256);
+
+            if (companiesComboBox)
+                GetWindowText(companiesComboBox, companiesText, 256);
+
+
+
+            wcscat_s(destination, MAX_PATH, yearText);
+            wcscat_s(destination, MAX_PATH, L"\\Parts Receipts ");
+            wcscat_s(destination, MAX_PATH, yearText);
+            wcscat_s(destination, MAX_PATH, L"\\");
+            wcscat_s(destination, MAX_PATH, monthText);
+
+
+            wcscat_s(filename, 128, companiesText);
+            wcscat_s(filename, 128, L".pdf");
+
+            wcscat_s(destination, MAX_PATH, L"\\");
+            wcscat_s(destination, MAX_PATH, filename);
+
+            if (GetFileAttributesW(oldFilename) == INVALID_FILE_ATTRIBUTES) {
+                MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
+            }
+
+
+            if (!MoveFileW(oldFilename, destination)) {
+                DWORD err = GetLastError();
+                wchar_t buf[256];
+                swprintf_s(buf, 256, L"Failed to move file to: %ls (Error %lu)", destination, err);
+                MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+            }
+
+            break;
+
+        default: ;
+    }
+}
+
 bool IsFileSendReady(int currentPage) {
     int monthIndex = -1;
     int yearIndex = -1;
@@ -75,6 +209,8 @@ bool IsFileSendReady(int currentPage) {
 
             if (yearComboBox)
                 yearIndex = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
+
+
 
             return (wcslen(nameText) > 0) &&
                    (wcslen(poText) > 0) &&
@@ -248,7 +384,7 @@ NOTIFYICONDATA nid;
 
 DWORD WINAPI WatchFolder(LPVOID lpParam) {
     HWND hwndParent = (HWND)lpParam;
-    LPCWSTR folderPath = L"C:\\watch_folder";
+    LPCWSTR folderPath = L"C:\\watchFolder";
 
     HANDLE hDir = CreateFileW(
         folderPath,
@@ -667,7 +803,8 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                     TCHAR year[256] = {0};
                     TCHAR companiesText[256] = {0};
 
-                    GetAllPageValues(name, po, month, year, companiesText);
+                    SaveFile(currentPage, name, po, month, year, companiesText);
+
 
 
                     wchar_t buf[1024];
