@@ -3,8 +3,8 @@
 #include <commctrl.h>
 #include <stdbool.h>
 #include <stdio.h>
-#pragma comment(lib, "comctl32.lib")
 #include <string.h>
+#pragma comment(lib, "comctl32.lib")
 
 
 #define WM_TRAYICON (WM_USER + 1)
@@ -56,12 +56,22 @@ HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text);
 int running = 1;
 
 int g_CurrentPage = 0;
+WCHAR g_CurrentFilename[MAX_PATH];
 int PAGE_COUNT = 3;
 
 
 
 void SaveFile(int currentPage, wchar_t* nameText, wchar_t* poText, wchar_t* monthText, wchar_t* yearText, wchar_t* companiesText) {
-    wchar_t *oldFilename = L"C:\\watchFolder\\placeholder.pdf";
+    wchar_t oldFilename[MAX_PATH];
+    swprintf_s(
+        oldFilename,
+        MAX_PATH,
+        L"C:\\watchFolder\\%s",
+        g_CurrentFilename
+    );
+
+    CharUpperBuffW(oldFilename, wcslen(oldFilename));
+
 
     wchar_t destination[MAX_PATH] = L"C:\\Users\\12096\\DropBox\\Harrison's DropBox\\";
 
@@ -91,22 +101,26 @@ void SaveFile(int currentPage, wchar_t* nameText, wchar_t* poText, wchar_t* mont
             wcscat_s(filename, 128, poText);
             wcscat_s(filename, 128, L".pdf");
 
-            wcscat_s(destination, MAX_PATH, L"\\"); 
+            wcscat_s(destination, MAX_PATH, L"\\");
             wcscat_s(destination, MAX_PATH, filename);
 
             if (GetFileAttributesW(oldFilename) == INVALID_FILE_ATTRIBUTES) {
                 MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
+                return;
             }
 
 
-            if (!MoveFileW(oldFilename, destination)) {
+            if (!MoveFileExW(oldFilename, destination, MOVEFILE_REPLACE_EXISTING)) {
                 DWORD err = GetLastError();
                 wchar_t buf[256];
                 swprintf_s(buf, 256, L"Failed to move file to: %ls (Error %lu)", destination, err);
                 MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+                return;
             }
 
-            break; 
+            g_CurrentFilename[0] = L'\0';
+
+            break;
 
 
 
@@ -137,6 +151,8 @@ void SaveFile(int currentPage, wchar_t* nameText, wchar_t* poText, wchar_t* mont
             if (GetFileAttributesW(oldFilename) == INVALID_FILE_ATTRIBUTES) {
                 MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
             }
+
+
 
 
             if (!MoveFileW(oldFilename, destination)) {
@@ -632,11 +648,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_APP + 1: {
             WCHAR* filename = (WCHAR*)lParam;
-            static WCHAR buffer[256];
-            wcsncpy_s(buffer, 256, filename, 255);
-            buffer[255] = 0;
+            wcsncpy_s(g_CurrentFilename, MAX_PATH, filename, _TRUNCATE);
             if (filename != NULL) {
-                OpenPopupWindow(hwnd, buffer);
+                OpenPopupWindow(hwnd, g_CurrentFilename);
                 free(filename);
             }
         } break;
@@ -807,9 +821,12 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 
 
-                    wchar_t buf[1024];
-                    swprintf_s(buf, 1024, L"Name: %s\nPO: %s\nMonth: %s\nYear: %s\nCompany: %s", name, po, month, year, companiesText);
-                    MessageBox(hwnd, buf, L"Current Values", MB_OK);
+                    wchar_t buf[256];
+                    swprintf_s(buf, 256, L"File saved successfully!");
+                    MessageBox(hwnd, buf, L"Success", MB_OK);
+
+                    DestroyWindow(hwnd);
+
 
                     break;
             default: ;
@@ -1115,7 +1132,7 @@ int WINAPI WinMain(
     nid.uID = 1;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
-    wcscpy_s(nid.szTip, sizeof(nid.szTip), L"Your Tooltip Text Here");
+    wcscpy_s(nid.szTip, sizeof(nid.szTip), L"File Warden");
 
     Shell_NotifyIcon(NIM_ADD, &nid);
 
