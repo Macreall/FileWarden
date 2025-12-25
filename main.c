@@ -15,6 +15,7 @@
 #define IDC_COMBOBOX_DATES 101
 #define IDC_SAVE_BUTTON 105
 
+
 HWND hPopupTab = NULL;
 HWND hPopupWnd = NULL;
 HWND hSettingsWnd = NULL;
@@ -33,19 +34,6 @@ HWND nameBox = NULL;
 HWND poBox = NULL;
 HWND hButton = NULL;
 
-TCHAR* months[] = {
-    TEXT("January"), TEXT("February"), TEXT("March"), TEXT("April"),
-    TEXT("May"), TEXT("June"), TEXT("July"), TEXT("August"), TEXT("September"),
-    TEXT("October"), TEXT("November"), TEXT("December"),
-};
-
-TCHAR* years[] = {
-    TEXT("2020"), TEXT("2021"), TEXT("2022"), TEXT("2023"),
-    TEXT("2024"), TEXT("2025"), TEXT("2026"), TEXT("2027"), TEXT("2028"),
-    TEXT("2029"), TEXT("2030"),
-};
-
-TCHAR* companies[] = {TEXT("WorldPac"), TEXT("Autozone"), TEXT("O'Reillys")};
 
 
 
@@ -58,6 +46,34 @@ int running = 1;
 int g_CurrentPage = 0;
 WCHAR g_CurrentFilename[MAX_PATH];
 int PAGE_COUNT = 3;
+
+
+
+void LoadFromIni(HWND comboBox, LPCWSTR text) {
+    SendMessage(comboBox, CB_RESETCONTENT, 0, 0);
+
+    WCHAR value[64];
+    WCHAR key[8];
+    int index = 1;
+
+    while (1) {
+        swprintf_s(key, 8, L"%d", index);
+        GetPrivateProfileStringW(
+            text,
+            key,
+            L"",
+            value,
+            64,
+            L"C:\\watchFolder\\settings.ini"
+        );
+
+        if (value[0] == L'\0')
+            break;
+
+        SendMessage(comboBox, CB_ADDSTRING, 0, (LPARAM)value);
+        index++;
+    }
+}
 
 
 
@@ -81,6 +97,7 @@ void SaveFile(int currentPage, wchar_t* nameText, wchar_t* poText, wchar_t* mont
 
 
 
+
     switch (currentPage) {
         case 0:
             if (nameBox)
@@ -89,8 +106,14 @@ void SaveFile(int currentPage, wchar_t* nameText, wchar_t* poText, wchar_t* mont
             if (poBox)
                 GetWindowText(poBox, poText, 256);
 
+            int sel = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
+            if (sel != CB_ERR)
+                SendMessage(yearComboBox, CB_GETLBTEXT, sel, (LPARAM)yearText);
+
             if (yearComboBox)
                 GetWindowText(yearComboBox, yearText, 256);
+
+
 
             wcscat_s(destination, MAX_PATH, yearText);
             wcscat_s(destination, MAX_PATH, L"\\Job Tickets ");
@@ -129,6 +152,15 @@ void SaveFile(int currentPage, wchar_t* nameText, wchar_t* poText, wchar_t* mont
         case 1:
             if (nameBox)
                 GetWindowText(nameBox, nameText, 256);
+
+            int sel2 = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
+            int sel3 = (int)SendMessage(monthComboBox, CB_GETCURSEL, 0, 0);
+
+            if (sel2 != CB_ERR)
+                SendMessage(yearComboBox, CB_GETLBTEXT, sel2, (LPARAM)yearText);
+            if (sel3 != CB_ERR)
+                SendMessage(monthComboBox, CB_GETLBTEXT, sel3, (LPARAM)monthText);
+
             if (monthComboBox)
                 GetWindowText(monthComboBox, monthText, 256);
 
@@ -207,7 +239,7 @@ void SaveFile(int currentPage, wchar_t* nameText, wchar_t* poText, wchar_t* mont
                 MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
                 return;
             }
-            
+
             g_CurrentFilename[0] = L'\0';
 
             break;
@@ -232,6 +264,8 @@ bool IsFileSendReady(int currentPage) {
 
             if (yearComboBox)
                 yearIndex = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
+
+
 
 
 
@@ -304,15 +338,12 @@ void SetPage(int newPage)
             SetWindowText(hLabel2, L"PO Number:");
             ShowWindow(hLabel2, SW_SHOW);
             ShowWindow(companiesComboBox, SW_HIDE);
-            SendMessage(monthComboBox, CB_RESETCONTENT, 0, 0);
 
-            SendMessage(yearComboBox, CB_RESETCONTENT, 0, 0);
-            for (int i = 0; i < _countof(years); i++) {
-                SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
-            }
+            LoadFromIni(yearComboBox, L"Years");
 
 
             ShowWindow(hButton, SW_SHOW);
+
 
 
             break;
@@ -328,17 +359,13 @@ void SetPage(int newPage)
 
             SetWindowText(hLabel1, L"Invoice Date");
 
+            LoadFromIni(yearComboBox, L"Years");
+            LoadFromIni(monthComboBox, L"Months");
 
-            SendMessage(monthComboBox, CB_RESETCONTENT, 0, 0);
-            for (int i = 0; i < _countof(months); i++) {
-                SendMessage(monthComboBox, CB_ADDSTRING, 0, (LPARAM)months[i]);
-            }
-            SendMessage(yearComboBox, CB_RESETCONTENT, 0, 0);
-            for (int i = 0; i < _countof(years); i++) {
-                SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
-            }
+
 
             ShowWindow(hButton, SW_SHOW);
+
 
 
             break;
@@ -353,21 +380,18 @@ void SetPage(int newPage)
             ShowWindow(companiesComboBox, SW_SHOW);
             SetWindowText(hLabel1, L"Companies Name:");
 
+            LoadFromIni(companiesComboBox, L"Companies");
+            LoadFromIni(yearComboBox, L"Years");
+            LoadFromIni(monthComboBox, L"Months");
 
-            SendMessage(monthComboBox, CB_RESETCONTENT, 0, 0);
-            for (int i = 0; i < _countof(months); i++) {
-                SendMessage(monthComboBox, CB_ADDSTRING, 0, (LPARAM)months[i]);
-            }
-            SendMessage(yearComboBox, CB_RESETCONTENT, 0, 0);
-            for (int i = 0; i < _countof(years); i++) {
-                SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
-            }
-            SendMessage(companiesComboBox, CB_RESETCONTENT, 0, 0);
-            for (int i = 0; i < _countof(companies); i++) {
-                SendMessage(companiesComboBox, CB_ADDSTRING, 0, (LPARAM)companies[i]);
-            }
+
+
+
+
+
 
             ShowWindow(hButton, SW_SHOW);
+
 
 
             break;
@@ -452,7 +476,9 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             DestroyWindow(hwnd);
             break;
         case WM_DESTROY:
+            Shell_NotifyIcon(NIM_DELETE, &nid);
             hSettingsWnd = NULL;
+            PostQuitMessage(0);
             break;
 
         case WM_ERASEBKGND:
@@ -527,6 +553,7 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                 NULL
 
             );
+
 
 
             hLabel1 = CreateWindowEx(
@@ -613,10 +640,6 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
 
 
 
-            SendMessage(yearComboBox, CB_RESETCONTENT, 0, 0);
-            for (int i = 0; i < _countof(years); i++) {
-                SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
-            }
 
         }
             break;
@@ -649,6 +672,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
             wcsncpy_s(g_CurrentFilename, MAX_PATH, filename, _TRUNCATE);
             OpenPopupWindow(hwnd, g_CurrentFilename);
+            LoadFromIni(yearComboBox, L"Years");
             free(filename);
         } break;
 
@@ -672,7 +696,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
-            case ID_TRAY_EXIT:
+                case ID_TRAY_EXIT:
                     DestroyWindow(hwnd);
                     break;
             case ID_TRAY_SETTINGS:
@@ -681,6 +705,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             case ID_TRAY_ABOUT:
                     MessageBox(hwnd, L"TrayApp v1.0", L"About", MB_OK);
                     break;
+
+
+
+
 
             default: ;
             }
@@ -978,8 +1006,10 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 
 
+
             ShowWindow(monthComboBox, SW_HIDE);
             ShowWindow(hMonthLabel, SW_HIDE);
+
 
             ShowWindow(yearComboBox, SW_SHOW);
             ShowWindow(hYearLabel, SW_SHOW);
@@ -987,11 +1017,6 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             ShowWindow(hButton, SW_SHOW);
 
 
-
-            SendMessage(yearComboBox, CB_RESETCONTENT, 0, 0);
-            for (int i = 0; i < _countof(years); i++) {
-                SendMessage(yearComboBox, CB_ADDSTRING, 0, (LPARAM)years[i]);
-            }
 
         }
             break;
@@ -1003,6 +1028,8 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 }
 
 HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text) {
+
+
     const wchar_t CLASS_NAME[] = L"PopupWindowClass";
 
 
@@ -1191,4 +1218,3 @@ int WINAPI WinMain(
 
     return (int)msg.wParam;
 }
-
