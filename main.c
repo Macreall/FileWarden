@@ -155,12 +155,16 @@ void SaveFile(int currentPage, wchar_t* nameText, wchar_t* poText, wchar_t* mont
 
 
 
-            if (!MoveFileW(oldFilename, destination)) {
+            if (!MoveFileExW(oldFilename, destination, MOVEFILE_REPLACE_EXISTING)) {
                 DWORD err = GetLastError();
                 wchar_t buf[256];
                 swprintf_s(buf, 256, L"Failed to move file to: %ls (Error %lu)", destination, err);
                 MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+                return;
             }
+
+            g_CurrentFilename[0] = L'\0';
+
 
             break;
 
@@ -196,12 +200,15 @@ void SaveFile(int currentPage, wchar_t* nameText, wchar_t* poText, wchar_t* mont
             }
 
 
-            if (!MoveFileW(oldFilename, destination)) {
+            if (!MoveFileExW(oldFilename, destination, MOVEFILE_REPLACE_EXISTING)) {
                 DWORD err = GetLastError();
                 wchar_t buf[256];
                 swprintf_s(buf, 256, L"Failed to move file to: %ls (Error %lu)", destination, err);
                 MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+                return;
             }
+            
+            g_CurrentFilename[0] = L'\0';
 
             break;
 
@@ -261,25 +268,6 @@ bool IsFileSendReady(int currentPage) {
             return false;
     }
 }
-
-void GetAllPageValues(TCHAR* nameText, TCHAR* poText, TCHAR* monthText, TCHAR* yearText, TCHAR* companiesText)
-{
-    if (nameBox)
-        GetWindowText(nameBox, nameText, 256);
-
-    if (poBox)
-        GetWindowText(poBox, poText, 256);
-
-    if (monthComboBox)
-        GetWindowText(monthComboBox, monthText, 256);
-
-    if (yearComboBox)
-        GetWindowText(yearComboBox, yearText, 256);
-
-    if (companiesComboBox)
-        GetWindowText(companiesComboBox, companiesText, 256);
-}
-
 
 
 void SetPage(int newPage)
@@ -648,11 +636,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_APP + 1: {
             WCHAR* filename = (WCHAR*)lParam;
-            wcsncpy_s(g_CurrentFilename, MAX_PATH, filename, _TRUNCATE);
-            if (filename != NULL) {
-                OpenPopupWindow(hwnd, g_CurrentFilename);
+
+            if (!filename)
+                break;
+
+            size_t len = wcslen(filename);
+
+            if (len < 4 || _wcsicmp(filename + len - 4, L".pdf") != 0) {
                 free(filename);
+                break;
             }
+
+            wcsncpy_s(g_CurrentFilename, MAX_PATH, filename, _TRUNCATE);
+            OpenPopupWindow(hwnd, g_CurrentFilename);
+            free(filename);
         } break;
 
         case WM_TRAYICON:
