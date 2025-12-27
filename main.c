@@ -3,15 +3,12 @@
 #include <commctrl.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <string.h>
-#pragma comment(lib, "comctl32.lib")
 
 
 #define WM_TRAYICON (WM_USER + 1)
 #define ID_TRAY_EXIT 1001
 #define ID_TRAY_SETTINGS  1002
 #define ID_TRAY_ABOUT     1003
-
 #define IDC_COMBOBOX_DATES 101
 #define IDC_SAVE_BUTTON 105
 
@@ -19,13 +16,13 @@
 HWND hPopupTab = NULL;
 HWND hPopupWnd = NULL;
 HWND hSettingsWnd = NULL;
-HINSTANCE g_hInstance = NULL;
 HWND hSettingsTab = NULL;
-HWND hPagePC = NULL;
-HWND hPageApps = NULL;
+
+HINSTANCE g_hInstance = NULL;
 HWND monthComboBox = NULL;
 HWND yearComboBox = NULL;
 HWND companiesComboBox = NULL;
+
 HWND hLabel1 = NULL;
 HWND hLabel2 = NULL;
 HWND hMonthLabel = NULL;
@@ -314,8 +311,6 @@ void SetPage(int newPage)
     if (hPopupTab)
         TabCtrl_SetCurSel(hPopupTab, newPage);
 
-    ShowWindow(hPagePC, SW_HIDE);
-    ShowWindow(hPageApps, SW_HIDE);
     ShowWindow(nameBox, SW_HIDE);
     ShowWindow(poBox, SW_HIDE);
     ShowWindow(monthComboBox, SW_HIDE);
@@ -329,7 +324,6 @@ void SetPage(int newPage)
     switch (newPage)
     {
         case 0:
-            ShowWindow(hPagePC, SW_SHOW);
             ShowWindow(nameBox, SW_SHOW);
             ShowWindow(poBox, SW_SHOW);
             ShowWindow(hYearLabel, SW_SHOW);
@@ -352,7 +346,6 @@ void SetPage(int newPage)
             break;
 
         case 1:
-            ShowWindow(hPageApps, SW_SHOW);
             ShowWindow(nameBox, SW_SHOW);
             ShowWindow(monthComboBox, SW_SHOW);
             ShowWindow(yearComboBox, SW_SHOW);
@@ -374,7 +367,6 @@ void SetPage(int newPage)
             break;
 
         case 2:
-            ShowWindow(hPageApps, SW_SHOW);
             ShowWindow(monthComboBox, SW_SHOW);
             ShowWindow(nameBox, SW_HIDE);
             ShowWindow(yearComboBox, SW_SHOW);
@@ -1216,6 +1208,8 @@ int WINAPI WinMain(
                 default: ;
             }
         }
+
+
 
         HWND hDlg = ownerWnd ? ownerWnd : msg.hwnd;
         if (!IsDialogMessage(hDlg, &msg))
