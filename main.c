@@ -334,10 +334,13 @@ void SetPage(int newPage)
             ShowWindow(poBox, SW_SHOW);
             ShowWindow(hYearLabel, SW_SHOW);
             ShowWindow(yearComboBox, SW_SHOW);
+
+
             SetWindowText(hLabel1, L"Customer's Name:");
             SetWindowText(hLabel2, L"PO Number:");
             ShowWindow(hLabel2, SW_SHOW);
             ShowWindow(companiesComboBox, SW_HIDE);
+
 
             LoadFromIni(yearComboBox, L"Years");
 
@@ -494,7 +497,7 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
 
         case WM_CREATE:
         {
-            HWND hButton = CreateWindow(
+            hButton = CreateWindow(
                        L"BUTTON",
                        L"Send",
                        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
@@ -593,10 +596,10 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                 NULL);
 
             nameBox = CreateWindowEx(
-                0,
+                WS_EX_CLIENTEDGE,
                 L"EDIT",
                 L"",
-                WS_CHILD | WS_VISIBLE | SS_LEFT | WS_TABSTOP,
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                 50, 70,
                 220, 20,
                 hwnd,
@@ -630,6 +633,8 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
 
 
 
+
+
             ShowWindow(monthComboBox, SW_HIDE);
             ShowWindow(hMonthLabel, SW_HIDE);
 
@@ -637,6 +642,7 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             ShowWindow(hYearLabel, SW_SHOW);
 
             ShowWindow(hButton, SW_SHOW);
+
 
 
 
@@ -790,8 +796,7 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
             int page = TabCtrl_GetCurSel(hTab);
 
-            switch (wParam)
-            {
+            switch (wParam) {
                 case VK_LEFT:
                     if (page > 0) {
                         TabCtrl_SetCurSel(hTab, page - 1);
@@ -871,7 +876,7 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
         case WM_CREATE:
         {
-            HWND hButton = CreateWindow(
+            hButton = CreateWindow(
                        L"BUTTON",
                        L"Send",
                        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
@@ -969,10 +974,10 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 NULL);
 
             nameBox = CreateWindowEx(
-                0,
+                WS_EX_CLIENTEDGE,
                 L"EDIT",
                 L"",
-                WS_CHILD | WS_VISIBLE | SS_LEFT | WS_TABSTOP,
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
                 50, 70,
                 220, 20,
                 hwnd,
@@ -993,16 +998,18 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 NULL);
 
             poBox = CreateWindowEx(
-                0,
+                WS_EX_CLIENTEDGE,
                 L"EDIT",
                 L"",
-                WS_CHILD | WS_VISIBLE | SS_LEFT | WS_TABSTOP,
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
                 50, 120,
                 220, 20,
                 hwnd,
                 NULL,
                 GetModuleHandle(NULL),
                 NULL);
+
+
 
 
 
@@ -1076,6 +1083,8 @@ HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text) {
     NULL,
     NULL
 );
+
+
 
 
     TCITEM tie;
