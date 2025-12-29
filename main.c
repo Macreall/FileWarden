@@ -13,6 +13,7 @@
 #define IDC_SAVE_BUTTON 105
 
 
+
 HWND hPopupTab = NULL;
 HWND hPopupWnd = NULL;
 HWND hSettingsWnd = NULL;
@@ -43,6 +44,48 @@ int running = 1;
 int g_CurrentPage = 0;
 WCHAR g_CurrentFilename[MAX_PATH];
 int PAGE_COUNT = 3;
+
+int LoadTabCount(void)
+{
+    return GetPrivateProfileIntW(
+        L"Tabs",
+        L"Count",
+        0,
+        L"C:\\watchFolder\\settings.ini"
+    );
+}
+
+void LoadTabsFromIni(HWND hTab)
+{
+    TabCtrl_DeleteAllItems(hTab);
+
+    int count = LoadTabCount();
+
+    for (int i = 0; i < count; i++)
+    {
+        wchar_t section[16];
+        wchar_t name[64];
+
+        swprintf_s(section, 16, L"Tab%d", i);
+
+        GetPrivateProfileStringW(
+            section,
+            L"Name",
+            L"Unnamed",
+            name,
+            64,
+            L"C:\\watchFolder\\settings.ini"
+        );
+
+        TCITEM tie = {0};
+        tie.mask = TCIF_TEXT;
+        tie.pszText = name;
+
+        TabCtrl_InsertItem(hTab, i, &tie);
+    }
+
+    PAGE_COUNT = count;
+}
 
 
 
@@ -1077,19 +1120,10 @@ HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text) {
 );
 
 
+    LoadTabsFromIni(hPopupTab);
+    SetPage(0);
 
 
-    TCITEM tie;
-    tie.mask = TCIF_TEXT;
-
-    tie.pszText = L"Job Tickets";
-    TabCtrl_InsertItem(hPopupTab, 0, &tie);
-
-    tie.pszText = L"Invoices";
-    TabCtrl_InsertItem(hPopupTab, 1, &tie);
-
-    tie.pszText = L"Parts Receipts";
-    TabCtrl_InsertItem(hPopupTab, 2, &tie);
 
 
 
