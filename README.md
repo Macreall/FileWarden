@@ -1,5 +1,5 @@
 # FileWarden
-This is a lightweight C WIN32 application that gives you a gui to update file paths scanned from a printer.
+This is a lightweight C WIN32 application that gives you a gui to update file paths scanned from a printer. This app allows you to have more than the basic printer settings of 4 file path saving options. This gives you the options to choose as many paths as you would like.
 
 Important notes before downloading:
 - This application is meant to run in the background on startup.
@@ -13,3 +13,4 @@ You can edit the settings directly in C:\watchFolder, or through the settings me
 Application info:
 - Release file is about 80 kilobytes of data
 - Runtime memory usage is about 10 megabytes.
+
