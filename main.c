@@ -8,7 +8,6 @@
 #define WM_TRAYICON (WM_USER + 1)
 #define ID_TRAY_EXIT 1001
 #define ID_TRAY_SETTINGS  1002
-#define ID_TRAY_ABOUT     1003
 #define IDC_COMBOBOX_DATES 101
 #define IDC_SAVE_BUTTON 105
 
@@ -722,7 +721,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 HMENU menu = CreatePopupMenu();
 
                 AppendMenu(menu, MF_STRING, ID_TRAY_SETTINGS, L"Settings");
-                AppendMenu(menu, MF_STRING, ID_TRAY_ABOUT, L"About");
                 AppendMenu(menu, MF_SEPARATOR, 0, NULL);
                 AppendMenu(menu, MF_STRING, ID_TRAY_EXIT, L"Exit");
 
@@ -742,9 +740,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     break;
             case ID_TRAY_SETTINGS:
                     OpenSettingsWindow(g_hInstance, hwnd);
-                    break;
-            case ID_TRAY_ABOUT:
-                    MessageBox(hwnd, L"TrayApp v1.0", L"About", MB_OK);
                     break;
 
 
