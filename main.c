@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 
+
 #define WM_TRAYICON (WM_USER + 1)
 #define ID_TRAY_EXIT 1001
 #define ID_TRAY_SETTINGS  1002
@@ -32,19 +33,80 @@ HWND poBox = NULL;
 HWND hButton = NULL;
 
 
+typedef enum {
+    FIELD_EDIT,
+    FIELD_COMBO,
+    FIELD_CHECKBOX
+} FIELD_TYPE;
+
+typedef struct
+{
+    wchar_t label[64];
+    wchar_t key[32];
+    FIELD_TYPE type;
+} FIELD;
+
+typedef struct
+{
+    wchar_t name[64];
+    wchar_t type[16];
+
+    FIELD fields[16];
+    u_int fieldCount;
+} TAB_DATA;
+
+LPCWSTR INI_PATH = L"C:\\watchFolder\\settings.ini";
+
+#define MAX_TABS 32
+#define MAX_FIELDS 32
 
 
+HWND fieldLabels[MAX_FIELDS];
+HWND fieldControls[MAX_FIELDS];
+int activeFieldCount = 0;
+TAB_DATA Tabs[MAX_TABS];
 
-void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent);
-HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text);
+
 
 int running = 1;
 
 int g_CurrentPage = 0;
 WCHAR g_CurrentFilename[MAX_PATH];
-int PAGE_COUNT = 3;
+u_int PAGE_COUNT = 0;
 
-int LoadTabCount(void)
+
+void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent);
+HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text);
+
+
+
+void DestroyActiveFields(void)
+{
+    for (int i = 0; i < activeFieldCount; i++)
+    {
+        if (fieldLabels[i])   DestroyWindow(fieldLabels[i]);
+        if (fieldControls[i]) DestroyWindow(fieldControls[i]);
+    }
+    activeFieldCount = 0;
+}
+
+
+void LoadLabelsFromIni() {
+
+    wchar_t section[16];
+    wchar_t name[64];
+
+    GetPrivateProfileStringW(
+            section,
+            L"Labels",
+            L"Unnamed",
+            name,
+            64,
+            L"C:\\watchFolder\\settings.ini"
+        );
+}
+
+u_int LoadTabCount(void)
 {
     return GetPrivateProfileIntW(
         L"Tabs",
@@ -54,37 +116,173 @@ int LoadTabCount(void)
     );
 }
 
+
+void LoadTabFields(int tabIndex, const wchar_t* section)
+{
+    TAB_DATA* tab = &Tabs[tabIndex];
+
+    tab->fieldCount =
+        GetPrivateProfileIntW(section, L"FieldCount", 0, INI_PATH);
+
+    for (int f = 0; f < tab->fieldCount; f++)
+    {
+        wchar_t key[64];
+
+        swprintf_s(key, 64, L"Field%d.Label", f + 1);
+        GetPrivateProfileStringW(section, key, L"",
+            tab->fields[f].label, 64, INI_PATH);
+
+        swprintf_s(key, 64, L"Field%d.Key", f + 1);
+        GetPrivateProfileStringW(section, key, L"",
+            tab->fields[f].key, 32, INI_PATH);
+
+        swprintf_s(key, 64, L"Field%d.Control", f + 1);
+        wchar_t type[16];
+        GetPrivateProfileStringW(section, key, L"EDIT",
+            type, 16, INI_PATH);
+
+        tab->fields[f].type =
+            (_wcsicmp(type, L"COMBO") == 0) ? FIELD_COMBO :
+            (_wcsicmp(type, L"CHECK") == 0) ? FIELD_CHECKBOX :
+            FIELD_EDIT;
+    }
+}
+
+
+
+
 void LoadTabsFromIni(HWND hTab)
 {
     TabCtrl_DeleteAllItems(hTab);
 
-    int count = LoadTabCount();
+    PAGE_COUNT = LoadTabCount();
 
-    for (int i = 0; i < count; i++)
+    for (int i = 0; i < PAGE_COUNT; i++)
     {
         wchar_t section[16];
-        wchar_t name[64];
-
         swprintf_s(section, 16, L"Tab%d", i);
 
-        GetPrivateProfileStringW(
-            section,
-            L"Name",
-            L"Unnamed",
-            name,
-            64,
-            L"C:\\watchFolder\\settings.ini"
-        );
+        GetPrivateProfileStringW(section, L"Name", L"Unnamed",
+            Tabs[i].name, 64, INI_PATH);
+
+        GetPrivateProfileStringW(section, L"Type", L"",
+            Tabs[i].type, 16, INI_PATH);
+
+        LoadTabFields(i, section);
 
         TCITEM tie = {0};
         tie.mask = TCIF_TEXT;
-        tie.pszText = name;
-
+        tie.pszText = Tabs[i].name;
         TabCtrl_InsertItem(hTab, i, &tie);
     }
-
-    PAGE_COUNT = count;
 }
+
+
+
+
+
+
+
+
+
+
+void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
+{
+    DestroyActiveFields();
+
+    int xLabel = 50;
+    int xCtrl  = 50;
+    int y      = 50;
+
+    for (int i = 0; i < tab->fieldCount; i++)
+    {
+        FIELD* f = &tab->fields[i];
+
+        fieldLabels[i] = CreateWindowW(
+            L"STATIC",
+            f->label,
+            WS_CHILD | WS_VISIBLE,
+            xLabel, y,
+            200, 20,
+            parent,
+            NULL,
+            g_hInstance,
+            NULL
+        );
+
+        switch (f->type)
+        {
+            case FIELD_EDIT:
+                fieldControls[i] = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    L"EDIT",
+                    L"",
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
+                    xCtrl, y + 20,
+                    220, 22,
+                    parent,
+                    NULL,
+                    g_hInstance,
+                    NULL
+                );
+                y += 50;
+                break;
+
+            case FIELD_COMBO:
+                fieldControls[i] = CreateWindowW(
+                    WC_COMBOBOX,
+                    L"",
+                    WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
+                    xCtrl, y + 20,
+                    220, 200,
+                    parent,
+                    NULL,
+                    g_hInstance,
+                    NULL
+                );
+                y += 50;
+                break;
+
+            case FIELD_CHECKBOX:
+                fieldControls[i] = CreateWindowW(
+                    L"BUTTON",
+                    f->label,
+                    WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+                    xCtrl, y,
+                    220, 22,
+                    parent,
+                    NULL,
+                    g_hInstance,
+                    NULL
+                );
+                y += 30;
+                break;
+        }
+
+        activeFieldCount++;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -353,87 +551,8 @@ void SetPage(int newPage)
     if (hPopupTab)
         TabCtrl_SetCurSel(hPopupTab, newPage);
 
-    ShowWindow(nameBox, SW_HIDE);
-    ShowWindow(poBox, SW_HIDE);
-    ShowWindow(monthComboBox, SW_HIDE);
-    ShowWindow(yearComboBox, SW_HIDE);
-    ShowWindow(hMonthLabel, SW_HIDE);
-    ShowWindow(hYearLabel, SW_HIDE);
-    ShowWindow(hLabel2, SW_HIDE);
-    ShowWindow(companiesComboBox, SW_HIDE);
+    CreateFieldsFromTab(hPopupWnd, &Tabs[newPage]);
 
-
-    switch (newPage)
-    {
-        case 0:
-            ShowWindow(nameBox, SW_SHOW);
-            ShowWindow(poBox, SW_SHOW);
-            ShowWindow(hYearLabel, SW_SHOW);
-            ShowWindow(yearComboBox, SW_SHOW);
-
-
-            SetWindowText(hLabel1, L"Customer's Name:");
-            SetWindowText(hLabel2, L"PO Number:");
-            ShowWindow(hLabel2, SW_SHOW);
-            ShowWindow(companiesComboBox, SW_HIDE);
-
-
-            LoadFromIni(yearComboBox, L"Years");
-
-
-            ShowWindow(hButton, SW_SHOW);
-
-
-
-            break;
-
-        case 1:
-            ShowWindow(nameBox, SW_SHOW);
-            ShowWindow(monthComboBox, SW_SHOW);
-            ShowWindow(yearComboBox, SW_SHOW);
-            ShowWindow(hMonthLabel, SW_SHOW);
-            ShowWindow(hYearLabel, SW_SHOW);
-            ShowWindow(companiesComboBox, SW_HIDE);
-
-            SetWindowText(hLabel1, L"Invoice Date");
-
-            LoadFromIni(yearComboBox, L"Years");
-            LoadFromIni(monthComboBox, L"Months");
-
-
-
-            ShowWindow(hButton, SW_SHOW);
-
-
-
-            break;
-
-        case 2:
-            ShowWindow(monthComboBox, SW_SHOW);
-            ShowWindow(nameBox, SW_HIDE);
-            ShowWindow(yearComboBox, SW_SHOW);
-            ShowWindow(hMonthLabel, SW_SHOW);
-            ShowWindow(hYearLabel, SW_SHOW);
-            ShowWindow(companiesComboBox, SW_SHOW);
-            SetWindowText(hLabel1, L"Companies Name:");
-
-            LoadFromIni(companiesComboBox, L"Companies");
-            LoadFromIni(yearComboBox, L"Years");
-            LoadFromIni(monthComboBox, L"Months");
-
-
-
-
-
-
-
-            ShowWindow(hButton, SW_SHOW);
-
-
-
-            break;
-        default: ;
-    }
 }
 
 
@@ -669,6 +788,9 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
 
 
 
+
+
+
             ShowWindow(monthComboBox, SW_HIDE);
             ShowWindow(hMonthLabel, SW_HIDE);
 
@@ -741,9 +863,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             case ID_TRAY_SETTINGS:
                     OpenSettingsWindow(g_hInstance, hwnd);
                     break;
-
-
-
 
 
             default: ;
@@ -1044,12 +1163,13 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 
 
+
             ShowWindow(monthComboBox, SW_HIDE);
             ShowWindow(hMonthLabel, SW_HIDE);
 
 
-            ShowWindow(yearComboBox, SW_SHOW);
-            ShowWindow(hYearLabel, SW_SHOW);
+            ShowWindow(yearComboBox, SW_HIDE);
+            ShowWindow(hYearLabel, SW_HIDE);
 
             ShowWindow(hButton, SW_SHOW);
 
@@ -1115,6 +1235,8 @@ HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text) {
 );
 
 
+
+
     LoadTabsFromIni(hPopupTab);
     SetPage(0);
 
@@ -1148,7 +1270,10 @@ int WINAPI WinMain(
     g_hInstance = hInstance;
 
 
-
+    INITCOMMONCONTROLSEX icex = {0};
+    icex.dwSize = sizeof(icex);
+    icex.dwICC = ICC_STANDARD_CLASSES | ICC_WIN95_CLASSES;
+    InitCommonControlsEx(&icex);
 
 
 
@@ -1187,6 +1312,8 @@ int WINAPI WinMain(
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
     wcscpy_s(nid.szTip, sizeof(nid.szTip), L"File Warden");
+
+
 
     Shell_NotifyIcon(NIM_ADD, &nid);
 
