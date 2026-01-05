@@ -1,14 +1,19 @@
 # FileWarden
-This is a lightweight C WIN32 application that gives you a gui to update file paths scanned from a printer. This app allows you to have more than the basic printer settings of 4 file path saving options. This gives you the options to choose as many paths as you would like.
+This lightweight WIN32 Application enhances your printer's scanning capabilities. With this tool, you can organize scanned documents across multiple folders, set custom naming rules, and go beyond the default scanner settings. 
+
+- Multiple save locations: - Add more than the default 4 locations for a printer
+- Custom folder structure: - Organize scans by year, month, job type, or any criteria
+- Flexible file naming rules: - Include whatever information you want to create structured filenames
+
+How to customize for your company:  
+- Settings.ini is where you can load custom info.
 
 Important notes before downloading:
 - This application is meant to run in the background on startup.
 - If you are working for a company where you scan hundreds or even thousands of files to specific folders and need to organize them quickly, this application is to give you quick options for renaming, moving, and organizing mass amounts of files with ease.
 - When watchFolder is updated with a pdf, it will open the window to choose where you want that file to go.
 
-How to customize for your company:  
-- Settings.ini is where you can load custom info.
-You can edit the settings directly in C:\watchFolder, or through the settings menu accessed through the tray icon.
+
 
 Application info:
 - Release file is about 80 kilobytes of data
