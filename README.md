@@ -1,6 +1,5 @@
 # FileWarden
-This lightweight WIN32 Application enhances your printer's scanning capabilities. With this tool, you can organize scanned documents across multiple folders, set custom naming rules, and go beyond the default scanner settings. 
-
+This lightweight WIN32 Application enhances your printer's scanning capabilities. With this tool you can go far beyond the default scanner settings. 
 - Multiple save locations: - Add more than the default 4 locations for a printer
 - Custom folder structure: - Organize scans by year, month, job type, or any criteria
 - Flexible file naming rules: - Include whatever information you want to create structured filenames
