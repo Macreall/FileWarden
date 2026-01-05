@@ -34,24 +34,33 @@ HWND hButton = NULL;
 
 
 typedef enum {
+    FIELD_LABEL,
     FIELD_EDIT,
     FIELD_COMBO,
     FIELD_CHECKBOX
-} FIELD_TYPE;
+} CONTROL_TYPE;
+
+
 
 typedef struct
 {
     wchar_t label[64];
-    wchar_t key[32];
-    FIELD_TYPE type;
-} FIELD;
+    CONTROL_TYPE controlType;
+    wchar_t sourceName[64];
+
+    int x;
+    int y;
+
+    HWND hControl;
+
+} FIELD_DATA;
 
 typedef struct
 {
     wchar_t name[64];
     wchar_t type[16];
 
-    FIELD fields[16];
+    FIELD_DATA fields[16];
     u_int fieldCount;
 } TAB_DATA;
 
@@ -76,7 +85,9 @@ u_int PAGE_COUNT = 0;
 
 
 void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent);
+void CreateFieldsFromTab(HWND parent, TAB_DATA* tab);
 HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text);
+
 
 
 
@@ -117,6 +128,36 @@ u_int LoadTabCount(void)
 }
 
 
+
+
+
+
+void PopulateControlData(FIELD_DATA* f)
+{
+    if (!f->hControl || f->controlType != FIELD_COMBO)
+        return;
+
+    SendMessage(f->hControl, CB_RESETCONTENT, 0, 0);
+
+    if (wcslen(f->sourceName) == 0)
+        return;
+
+    wchar_t buffer[2048];
+    GetPrivateProfileSectionW(f->sourceName, buffer, 2048, INI_PATH);
+
+    for (wchar_t* p = buffer; *p; p += wcslen(p) + 1)
+    {
+        wchar_t* eq = wcschr(p, L'=');
+        if (!eq) continue;
+        SendMessage(f->hControl, CB_ADDSTRING, 0, (LPARAM)(eq + 1));
+    }
+}
+
+
+
+
+
+
 void LoadTabFields(int tabIndex, const wchar_t* section)
 {
     TAB_DATA* tab = &Tabs[tabIndex];
@@ -126,27 +167,36 @@ void LoadTabFields(int tabIndex, const wchar_t* section)
 
     for (int f = 0; f < tab->fieldCount; f++)
     {
+        FIELD_DATA* field = &tab->fields[f];
+
         wchar_t key[64];
 
-        swprintf_s(key, 64, L"Field%d.Label", f + 1);
+        swprintf_s(key, 64, L"Field%d.Label", f);
         GetPrivateProfileStringW(section, key, L"",
-            tab->fields[f].label, 64, INI_PATH);
+            field->label, 64, INI_PATH);
 
-        swprintf_s(key, 64, L"Field%d.Key", f + 1);
+        swprintf_s(key, 64, L"Field%d.Control", f);
+        wchar_t ctrl[32];
         GetPrivateProfileStringW(section, key, L"",
-            tab->fields[f].key, 32, INI_PATH);
+            ctrl, 32, INI_PATH);
 
-        swprintf_s(key, 64, L"Field%d.Control", f + 1);
-        wchar_t type[16];
-        GetPrivateProfileStringW(section, key, L"EDIT",
-            type, 16, INI_PATH);
+        swprintf_s(key, 64, L"Field%d.X", f);
+        field->x = GetPrivateProfileIntW(section, key, -1, INI_PATH);
 
-        tab->fields[f].type =
-            (_wcsicmp(type, L"COMBO") == 0) ? FIELD_COMBO :
-            (_wcsicmp(type, L"CHECK") == 0) ? FIELD_CHECKBOX :
-            FIELD_EDIT;
+        swprintf_s(key, 64, L"Field%d.Y", f);
+        field->y = GetPrivateProfileIntW(section, key, -1, INI_PATH);
+
+        if (!_wcsicmp(ctrl, L"EDIT")) field->controlType = FIELD_EDIT;
+        else if (!_wcsicmp(ctrl, L"COMBO")) field->controlType = FIELD_COMBO;
+        else if (!_wcsicmp(ctrl, L"CHECKBOX")) field->controlType = FIELD_CHECKBOX;
+        else field->controlType = FIELD_LABEL;
+
+        swprintf_s(key, 64, L"Field%d.Source", f);
+        GetPrivateProfileStringW(section, key, L"",
+            field->sourceName, 64, INI_PATH);
     }
 }
+
 
 
 
@@ -190,36 +240,49 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
 {
     DestroyActiveFields();
 
-    int xLabel = 50;
     int xCtrl  = 50;
-    int y      = 50;
+    int y = 50;
+
+    RECT rc;
+    GetClientRect(hPopupTab, &rc);
+    TabCtrl_AdjustRect(hPopupTab, FALSE, &rc);
+
+    int baseX = rc.left;
+    int baseY = rc.top;
+
+
 
     for (int i = 0; i < tab->fieldCount; i++)
     {
-        FIELD* f = &tab->fields[i];
+        FIELD_DATA* f = &tab->fields[i];
+
+        int drawX = baseX + ((f->x != -1) ? f->x : xCtrl);
+        int drawY = baseY + ((f->y != -1) ? f->y : y);
+
+
 
         fieldLabels[i] = CreateWindowW(
             L"STATIC",
             f->label,
             WS_CHILD | WS_VISIBLE,
-            xLabel, y,
-            200, 20,
+            drawX, drawY - 20,
+            180, 20,
             parent,
             NULL,
             g_hInstance,
             NULL
         );
 
-        switch (f->type)
+        switch (f->controlType)
         {
             case FIELD_EDIT:
-                fieldControls[i] = CreateWindowExW(
+                f->hControl = CreateWindowExW(
                     WS_EX_CLIENTEDGE,
                     L"EDIT",
                     L"",
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
-                    xCtrl, y + 20,
-                    220, 22,
+                    drawX, drawY,
+                    180, 22,
                     parent,
                     NULL,
                     g_hInstance,
@@ -229,12 +292,12 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
                 break;
 
             case FIELD_COMBO:
-                fieldControls[i] = CreateWindowW(
+                f->hControl = CreateWindowW(
                     WC_COMBOBOX,
                     L"",
                     WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
-                    xCtrl, y + 20,
-                    220, 200,
+                    drawX, drawY,
+                    200, 230,
                     parent,
                     NULL,
                     g_hInstance,
@@ -244,12 +307,12 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
                 break;
 
             case FIELD_CHECKBOX:
-                fieldControls[i] = CreateWindowW(
+                f->hControl = CreateWindowW(
                     L"BUTTON",
                     f->label,
                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                     xCtrl, y,
-                    220, 22,
+                    200, 22,
                     parent,
                     NULL,
                     g_hInstance,
@@ -257,7 +320,16 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
                 );
                 y += 30;
                 break;
+            default: ;
         }
+
+        if (f->controlType == FIELD_COMBO)
+        {
+            PopulateControlData(f);
+        }
+
+        fieldControls[i] = f->hControl;
+
 
         activeFieldCount++;
     }
@@ -553,6 +625,12 @@ void SetPage(int newPage)
 
     CreateFieldsFromTab(hPopupWnd, &Tabs[newPage]);
 
+    TAB_DATA* tab = &Tabs[g_CurrentPage];
+
+
+    for (int i = 0; i < tab->fieldCount; i++)
+        PopulateControlData(&tab->fields[i]);
+
 }
 
 
@@ -662,140 +740,6 @@ LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
                        (HMENU)IDC_SAVE_BUTTON,
                        (HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
                        NULL);
-
-
-
-            monthComboBox = CreateWindow(
-                WC_COMBOBOX,
-                TEXT(""),
-                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP,
-                350,
-                120,
-                120,
-                300,
-                hwnd,
-                (HMENU)IDC_COMBOBOX_DATES,
-                ((LPCREATESTRUCT)lParam)->hInstance,
-                NULL
-
-            );
-
-            yearComboBox = CreateWindow(
-                WC_COMBOBOX,
-                TEXT(""),
-                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP,
-                350,
-                70,
-                120,
-                300,
-                hwnd,
-                (HMENU)IDC_COMBOBOX_DATES,
-                ((LPCREATESTRUCT)lParam)->hInstance,
-                NULL
-
-            );
-
-            companiesComboBox = CreateWindow(
-                WC_COMBOBOX,
-                TEXT(""),
-                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VSCROLL | WS_TABSTOP,
-                50,
-                70,
-                120,
-                300,
-                hwnd,
-                (HMENU)IDC_COMBOBOX_DATES,
-                ((LPCREATESTRUCT)lParam)->hInstance,
-                NULL
-
-            );
-
-
-
-            hLabel1 = CreateWindowEx(
-                0,
-                L"STATIC",
-                L"Customer's Name:",
-                WS_CHILD | WS_VISIBLE | SS_LEFT,
-                50, 50,
-                150, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-            hMonthLabel = CreateWindowEx(
-                0,
-                L"STATIC",
-                L"Current Month",
-                WS_CHILD | WS_VISIBLE | SS_LEFT,
-                350, 100,
-                150, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-            hYearLabel = CreateWindowEx(
-                0,
-                L"STATIC",
-                L"Current Year",
-                WS_CHILD | WS_VISIBLE | SS_LEFT,
-                350, 50,
-                150, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-            nameBox = CreateWindowEx(
-                WS_EX_CLIENTEDGE,
-                L"EDIT",
-                L"",
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                50, 70,
-                220, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-            hLabel2 = CreateWindowEx(
-                0,
-                L"STATIC",
-                L"PO Number:",
-                WS_CHILD | WS_VISIBLE | SS_LEFT,
-                50, 100,
-                150, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-            poBox = CreateWindowEx(
-                0,
-                L"EDIT",
-                L"",
-                WS_CHILD | WS_VISIBLE | SS_LEFT | WS_TABSTOP,
-                50, 120,
-                220, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-
-
-
-
-
-
-
-            ShowWindow(monthComboBox, SW_HIDE);
-            ShowWindow(hMonthLabel, SW_HIDE);
-
-            ShowWindow(yearComboBox, SW_SHOW);
-            ShowWindow(hYearLabel, SW_SHOW);
 
             ShowWindow(hButton, SW_SHOW);
 
@@ -1038,138 +982,6 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                        (HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
                        NULL);
 
-
-
-            monthComboBox = CreateWindow(
-                WC_COMBOBOX,
-                TEXT(""),
-                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP,
-                350,
-                120,
-                120,
-                300,
-                hwnd,
-                (HMENU)IDC_COMBOBOX_DATES,
-                ((LPCREATESTRUCT)lParam)->hInstance,
-                NULL
-
-            );
-
-            yearComboBox = CreateWindow(
-                WC_COMBOBOX,
-                TEXT(""),
-                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP,
-                350,
-                70,
-                120,
-                300,
-                hwnd,
-                (HMENU)IDC_COMBOBOX_DATES,
-                ((LPCREATESTRUCT)lParam)->hInstance,
-                NULL
-
-            );
-
-            companiesComboBox = CreateWindow(
-                WC_COMBOBOX,
-                TEXT(""),
-                CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VSCROLL | WS_TABSTOP,
-                50,
-                70,
-                120,
-                300,
-                hwnd,
-                (HMENU)IDC_COMBOBOX_DATES,
-                ((LPCREATESTRUCT)lParam)->hInstance,
-                NULL
-
-            );
-
-
-            hLabel1 = CreateWindowEx(
-                0,
-                L"STATIC",
-                L"Customer's Name:",
-                WS_CHILD | WS_VISIBLE | SS_LEFT,
-                50, 50,
-                150, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-            hMonthLabel = CreateWindowEx(
-                0,
-                L"STATIC",
-                L"Current Month",
-                WS_CHILD | WS_VISIBLE | SS_LEFT,
-                350, 100,
-                150, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-            hYearLabel = CreateWindowEx(
-                0,
-                L"STATIC",
-                L"Current Year",
-                WS_CHILD | WS_VISIBLE | SS_LEFT,
-                350, 50,
-                150, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-            nameBox = CreateWindowEx(
-                WS_EX_CLIENTEDGE,
-                L"EDIT",
-                L"",
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
-                50, 70,
-                220, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-            hLabel2 = CreateWindowEx(
-                0,
-                L"STATIC",
-                L"PO Number:",
-                WS_CHILD | WS_VISIBLE | SS_LEFT,
-                50, 100,
-                150, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-            poBox = CreateWindowEx(
-                WS_EX_CLIENTEDGE,
-                L"EDIT",
-                L"",
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
-                50, 120,
-                220, 20,
-                hwnd,
-                NULL,
-                GetModuleHandle(NULL),
-                NULL);
-
-
-
-
-
-
-
-            ShowWindow(monthComboBox, SW_HIDE);
-            ShowWindow(hMonthLabel, SW_HIDE);
-
-
-            ShowWindow(yearComboBox, SW_HIDE);
-            ShowWindow(hYearLabel, SW_HIDE);
 
             ShowWindow(hButton, SW_SHOW);
 
