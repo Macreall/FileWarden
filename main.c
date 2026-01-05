@@ -47,6 +47,8 @@ typedef struct
     wchar_t label[64];
     CONTROL_TYPE controlType;
     wchar_t sourceName[64];
+    wchar_t value[256];
+
 
     int x;
     int y;
@@ -384,232 +386,190 @@ void LoadFromIni(HWND comboBox, LPCWSTR text) {
     }
 }
 
+void MakeUniqueFilename(wchar_t* destPath, const wchar_t* basePath) {
+    wcscpy_s(destPath, MAX_PATH, basePath);
+
+    if (GetFileAttributesW(destPath) == INVALID_FILE_ATTRIBUTES) {
+        return;
+    }
+
+    wchar_t drive[_MAX_DRIVE];
+    wchar_t dir[_MAX_DIR];
+    wchar_t fName[_MAX_FNAME];
+    wchar_t ext[_MAX_EXT];
+
+    _wsplitpath_s(destPath, drive, _MAX_DRIVE, dir, _MAX_DIR, fName, _MAX_FNAME, ext, _MAX_EXT);
+
+    int counter = 2;
+    wchar_t newPath[MAX_PATH];
+
+    while (1) {
+        swprintf_s(newPath, MAX_PATH, L"%s%s%s (%d)%s", drive, dir, fName, counter, ext);
+        if (GetFileAttributesW(newPath) == INVALID_FILE_ATTRIBUTES) {
+            wcscpy_s(destPath, MAX_PATH, newPath);
+            break;
+        }
+        counter++;
+    }
+}
 
 
-void SaveFile(int currentPage, wchar_t* nameText, wchar_t* poText, wchar_t* monthText, wchar_t* yearText, wchar_t* companiesText) {
+
+
+
+void SaveFile(int currentPage) {
+    if (currentPage < 0 || currentPage >= PAGE_COUNT) return;
+
+    TAB_DATA* tab = &Tabs[currentPage];
+
     wchar_t oldFilename[MAX_PATH];
-    swprintf_s(
-        oldFilename,
-        MAX_PATH,
-        L"C:\\watchFolder\\%s",
-        g_CurrentFilename
-    );
-
+    swprintf_s(oldFilename, MAX_PATH, L"C:\\watchFolder\\%s", g_CurrentFilename);
     CharUpperBuffW(oldFilename, wcslen(oldFilename));
 
+    if (GetFileAttributesW(oldFilename) == INVALID_FILE_ATTRIBUTES) {
+        MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
+        return;
+    }
 
-    wchar_t destination[MAX_PATH] = L"C:\\Users\\12096\\DropBox\\Harrison's DropBox\\";
+    wchar_t destination[MAX_PATH] = L"C:\\Users\\12906\\DropBox\\Harrison's DropBox\\";
+    wchar_t filename[256] = L"";
 
-    wchar_t filename[128] = L"";
+    wchar_t nameText[128] = L"";
+    wchar_t poText[128] = L"";
+    wchar_t yearText[64] = L"";
+    wchar_t monthText[64] = L"";
+    wchar_t companyText[128] = L"";
 
+    for (int i = 0; i < tab->fieldCount; i++) {
+        FIELD_DATA* f = &tab->fields[i];
+        if (!f->hControl) continue;
 
+        wchar_t temp[256] = L"";
+        GetWindowText(f->hControl, temp, 256);
 
-
-
+        if (_wcsicmp(f->label, L"Customer Name") == 0 ||
+            _wcsicmp(f->label, L"Invoice Date") == 0) {
+            wcscpy_s(nameText, 128, temp);
+        }
+        else if (_wcsicmp(f->label, L"PO Number") == 0) {
+            wcscpy_s(poText, 128, temp);
+        }
+        else if (_wcsicmp(f->label, L"Current Year") == 0) {
+            wcscpy_s(yearText, 64, temp);
+        }
+        else if (_wcsicmp(f->label, L"Current Month") == 0) {
+            wcscpy_s(monthText, 64, temp);
+        }
+        else if (_wcsicmp(f->label, L"Company") == 0) {
+            wcscpy_s(companyText, 128, temp);
+        }
+    }
 
     switch (currentPage) {
         case 0:
-            if (nameBox)
-                GetWindowText(nameBox, nameText, 256);
-
-            if (poBox)
-                GetWindowText(poBox, poText, 256);
-
-            int sel = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
-            if (sel != CB_ERR)
-                SendMessage(yearComboBox, CB_GETLBTEXT, sel, (LPARAM)yearText);
-
-            if (yearComboBox)
-                GetWindowText(yearComboBox, yearText, 256);
-
+            wcscat_s(filename, 256, nameText);
+            wcscat_s(filename, 256, L" #");
+            wcscat_s(filename, 256, poText);
+            wcscat_s(filename, 256, L".pdf");
 
 
             wcscat_s(destination, MAX_PATH, yearText);
             wcscat_s(destination, MAX_PATH, L"\\Job Tickets ");
             wcscat_s(destination, MAX_PATH, yearText);
-
-            wcscat_s(filename, 128, nameText);
-            wcscat_s(filename, 128, L" #");
-            wcscat_s(filename, 128, poText);
-            wcscat_s(filename, 128, L".pdf");
-
             wcscat_s(destination, MAX_PATH, L"\\");
-            wcscat_s(destination, MAX_PATH, filename);
-
-            if (GetFileAttributesW(oldFilename) == INVALID_FILE_ATTRIBUTES) {
-                MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
-                return;
-            }
-
-
-            if (!MoveFileExW(oldFilename, destination, MOVEFILE_REPLACE_EXISTING)) {
-                DWORD err = GetLastError();
-                wchar_t buf[256];
-                swprintf_s(buf, 256, L"Failed to move file to: %ls (Error %lu)", destination, err);
-                MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
-                return;
-            }
-
-            g_CurrentFilename[0] = L'\0';
-
             break;
 
-
-
-
-
         case 1:
-            if (nameBox)
-                GetWindowText(nameBox, nameText, 256);
-
-            int sel2 = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
-            int sel3 = (int)SendMessage(monthComboBox, CB_GETCURSEL, 0, 0);
-
-            if (sel2 != CB_ERR)
-                SendMessage(yearComboBox, CB_GETLBTEXT, sel2, (LPARAM)yearText);
-            if (sel3 != CB_ERR)
-                SendMessage(monthComboBox, CB_GETLBTEXT, sel3, (LPARAM)monthText);
-
-            if (monthComboBox)
-                GetWindowText(monthComboBox, monthText, 256);
-
-            if (yearComboBox)
-                GetWindowText(yearComboBox, yearText, 256);
+            wcscat_s(filename, 256, nameText);
+            wcscat_s(filename, 256, L".pdf");
 
             wcscat_s(destination, MAX_PATH, yearText);
             wcscat_s(destination, MAX_PATH, L"\\Invoices ");
             wcscat_s(destination, MAX_PATH, yearText);
             wcscat_s(destination, MAX_PATH, L"\\");
             wcscat_s(destination, MAX_PATH, monthText);
-
-
-            wcscat_s(filename, 128, nameText);
-            wcscat_s(filename, 128, L".pdf");
-
             wcscat_s(destination, MAX_PATH, L"\\");
-            wcscat_s(destination, MAX_PATH, filename);
-
-            if (GetFileAttributesW(oldFilename) == INVALID_FILE_ATTRIBUTES) {
-                MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
-            }
-
-
-
-
-            if (!MoveFileExW(oldFilename, destination, MOVEFILE_REPLACE_EXISTING)) {
-                DWORD err = GetLastError();
-                wchar_t buf[256];
-                swprintf_s(buf, 256, L"Failed to move file to: %ls (Error %lu)", destination, err);
-                MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
-                return;
-            }
-
-            g_CurrentFilename[0] = L'\0';
-
-
             break;
 
-
-
         case 2:
-            if (monthComboBox)
-                GetWindowText(monthComboBox, monthText, 256);
-
-            if (yearComboBox)
-                GetWindowText(yearComboBox, yearText, 256);
-
-            if (companiesComboBox)
-                GetWindowText(companiesComboBox, companiesText, 256);
-
-
+            wcscat_s(filename, 256, companyText);
+            wcscat_s(filename, 256, L".pdf");
 
             wcscat_s(destination, MAX_PATH, yearText);
             wcscat_s(destination, MAX_PATH, L"\\Parts Receipts ");
             wcscat_s(destination, MAX_PATH, yearText);
             wcscat_s(destination, MAX_PATH, L"\\");
             wcscat_s(destination, MAX_PATH, monthText);
-
-
-            wcscat_s(filename, 128, companiesText);
-            wcscat_s(filename, 128, L".pdf");
-
             wcscat_s(destination, MAX_PATH, L"\\");
-            wcscat_s(destination, MAX_PATH, filename);
-
-            if (GetFileAttributesW(oldFilename) == INVALID_FILE_ATTRIBUTES) {
-                MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
-            }
-
-
-            if (!MoveFileExW(oldFilename, destination, MOVEFILE_REPLACE_EXISTING)) {
-                DWORD err = GetLastError();
-                wchar_t buf[256];
-                swprintf_s(buf, 256, L"Failed to move file to: %ls (Error %lu)", destination, err);
-                MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
-                return;
-            }
-
-            g_CurrentFilename[0] = L'\0';
-
             break;
 
-        default: ;
+        default:
+            MessageBox(NULL, L"Unknown tab type!", L"Error", MB_OK | MB_ICONERROR);
+            return;
     }
+
+    wchar_t fullPath[MAX_PATH];
+    swprintf_s(fullPath, MAX_PATH, L"%s%s", destination, filename);
+
+    MakeUniqueFilename(fullPath, fullPath);
+
+    if (GetFileAttributesW(destination) == INVALID_FILE_ATTRIBUTES) {
+        if (!CreateDirectoryW(destination, NULL)) {
+            DWORD err = GetLastError();
+            wchar_t buf[256];
+            swprintf_s(buf, 256, L"Failed to create folder: %ls (Error %lu)", destination, err);
+            MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+            return;
+        }
+    }
+
+    if (!MoveFileExW(oldFilename, fullPath, MOVEFILE_REPLACE_EXISTING)) {
+        DWORD err = GetLastError();
+        wchar_t buf[256];
+        swprintf_s(buf, 256, L"Failed to move file to: %ls (Error %lu)", fullPath, err);
+        MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+
 }
 
+
+
+
 bool IsFileSendReady(int currentPage) {
-    int monthIndex = -1;
-    int yearIndex = -1;
-    TCHAR nameText[256] = {0};
-    TCHAR companiesNameText[256] = {0};
-    TCHAR poText[256] = {0};
+    if (currentPage < 0 || currentPage >= PAGE_COUNT)
+        return false;
 
-    switch (currentPage) {
-        case 0:
-            if (nameBox)
-                GetWindowText(nameBox, nameText, 256);
-            if (poBox)
-                GetWindowText(poBox, poText, 256);
+    TAB_DATA* tab = &Tabs[currentPage];
 
-            if (yearComboBox)
-                yearIndex = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
+    for (int i = 0; i < tab->fieldCount; i++) {
+        FIELD_DATA* f = &tab->fields[i];
+        if (!f->hControl)
+            continue;
+
+        switch (f->controlType) {
+            case FIELD_EDIT: {
+                wchar_t text[256];
+                GetWindowText(f->hControl, text, 256);
+                if (wcslen(text) == 0)
+                    return false;
+                break;
+            }
+
+            case FIELD_COMBO: {
+                int sel = (int)SendMessage(f->hControl, CB_GETCURSEL, 0, 0);
+                if (sel == CB_ERR)
+                    return false;
+                break;
+            }
 
 
-
-
-
-            return (wcslen(nameText) > 0) &&
-                   (wcslen(poText) > 0) &&
-                   (yearIndex != CB_ERR);
-
-        case 1:
-            if (nameBox)
-                GetWindowText(nameBox, nameText, 256);
-
-            if (monthComboBox)
-                monthIndex = (int)SendMessage(monthComboBox, CB_GETCURSEL, 0, 0);
-            if (yearComboBox)
-                yearIndex = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
-
-            return (wcslen(nameText) > 0) &&
-                   (monthIndex != CB_ERR) &&
-                   (yearIndex != CB_ERR);
-        case 2:
-            if (companiesComboBox)
-                GetWindowText(companiesComboBox, companiesNameText, 256);
-
-            if (monthComboBox)
-                monthIndex = (int)SendMessage(monthComboBox, CB_GETCURSEL, 0, 0);
-            if (yearComboBox)
-                yearIndex = (int)SendMessage(yearComboBox, CB_GETCURSEL, 0, 0);
-
-            return (wcslen(companiesNameText) > 0) &&
-                   (monthIndex != CB_ERR) &&
-                   (yearIndex != CB_ERR);
-
-        default:
-            return false;
+            default: break;
+        }
     }
+
+    return true;
 }
 
 
@@ -934,13 +894,8 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                         break;
                     }
 
-                    TCHAR name[256] = {0};
-                    TCHAR po[256] = {0};
-                    TCHAR month[256] = {0};
-                    TCHAR year[256] = {0};
-                    TCHAR companiesText[256] = {0};
 
-                    SaveFile(currentPage, name, po, month, year, companiesText);
+                    SaveFile(currentPage);
 
 
 
