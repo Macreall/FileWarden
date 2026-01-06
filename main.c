@@ -431,7 +431,7 @@ void SaveFile(int currentPage) {
         return;
     }
 
-    wchar_t destination[MAX_PATH] = L"C:\\Users\\12906\\DropBox\\Harrison's DropBox\\";
+    wchar_t destination[MAX_PATH] = L"C:\\Users\\12096\\DropBox\\Harrison's DropBox\\";
     wchar_t filename[256] = L"";
 
     wchar_t nameText[128] = L"";
