@@ -297,7 +297,7 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
                 f->hControl = CreateWindowW(
                     WC_COMBOBOX,
                     L"",
-                    WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP,
+                    WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL,
                     drawX, drawY,
                     200, 230,
                     parent,
