@@ -474,9 +474,6 @@ void SaveFile(int currentPage) {
         fieldCount++;
     }
 
-    wchar_t baseFolder[MAX_PATH] = L"";
-    GetPrivateProfileStringW(L"Save", L"BaseFolder", L"", baseFolder, MAX_PATH, INI_PATH);
-
     wchar_t oldFile[MAX_PATH];
     swprintf_s(oldFile, MAX_PATH, L"C:\\watchFolder\\%s", g_CurrentFilename);
     if (GetFileAttributesW(oldFile) == INVALID_FILE_ATTRIBUTES) {
@@ -484,61 +481,50 @@ void SaveFile(int currentPage) {
         return;
     }
 
-    for (int i = 1; i <= 10; i++) {
-        wchar_t key[32], filePattern[256], finalFile[256];
-        swprintf_s(key, 32, L"SavedFileName%d", i);
-        GetPrivateProfileStringW(tab->iniSection, key, L"", filePattern, 256, INI_PATH);
-        if (filePattern[0] == 0) continue;
+    wchar_t filePattern[256], finalFile[256];
+    GetPrivateProfileStringW(tab->iniSection, L"SavedFileName", L"", filePattern, 256, INI_PATH);
+    if (filePattern[0] == 0) {
+        MessageBox(NULL, L"No SavedFileName defined!", L"Error", MB_OK | MB_ICONERROR);
+        return;
+    }
+    ExpandTemplate(filePattern, finalFile, 256, fieldValues, fieldCount);
 
-        ExpandTemplate(filePattern, finalFile, 256, fieldValues, fieldCount);
+    for (int pnum = 1; pnum <= 10; pnum++) {
+        wchar_t pathKey[32], folderTemplate[512], expandedFolder[512];
+        swprintf_s(pathKey, 32, L"Path%d", pnum);
+        GetPrivateProfileStringW(tab->iniSection, pathKey, L"", folderTemplate, 512, INI_PATH);
+        if (folderTemplate[0] == 0) break;
 
-        for (int p = 1; p <= 10; p++) {
-            wchar_t pathKey[32], folderTemplate[512], expandedFolder[512];
-            swprintf_s(pathKey, 32, L"Path%d", p);
-            GetPrivateProfileStringW(tab->iniSection, pathKey, L"", folderTemplate, 512, INI_PATH);
-            if (folderTemplate[0] == 0) break;
+        ExpandTemplate(folderTemplate, expandedFolder, 512, fieldValues, fieldCount);
 
-            ExpandTemplate(folderTemplate, expandedFolder, 512, fieldValues, fieldCount);
+        if (expandedFolder[wcslen(expandedFolder) - 1] != L'\\')
+            wcscat_s(expandedFolder, 512, L"\\");
 
-            wchar_t fullFolder[MAX_PATH];
-            if ((expandedFolder[1] == L':' && expandedFolder[2] == L'\\') ||
-                (expandedFolder[0] == L'\\' && expandedFolder[1] == L'\\')) {
-                wcscpy_s(fullFolder, MAX_PATH, expandedFolder);
-            } else {
-                wcscpy_s(fullFolder, MAX_PATH, baseFolder);
-                if (fullFolder[wcslen(fullFolder)-1] != L'\\')
-                    wcscat_s(fullFolder, MAX_PATH, L"\\");
-                wcscat_s(fullFolder, MAX_PATH, expandedFolder);
-            }
-
-            if (fullFolder[wcslen(fullFolder)-1] != L'\\')
-                wcscat_s(fullFolder, MAX_PATH, L"\\");
-
-            wchar_t tempPath[MAX_PATH] = L"";
-            for (size_t j = 0; j < wcslen(fullFolder); j++) {
-                tempPath[j] = fullFolder[j];
-                tempPath[j+1] = 0;
-                if (fullFolder[j] == L'\\') {
-                    if (GetFileAttributesW(tempPath) == INVALID_FILE_ATTRIBUTES)
-                        CreateDirectoryW(tempPath, NULL);
-                }
-            }
-
-            wchar_t fullPath[MAX_PATH];
-            swprintf_s(fullPath, MAX_PATH, L"%s%s", fullFolder, finalFile);
-            MakeUniqueFilename(fullPath, fullPath);
-
-
-            if (!CopyFileW(oldFile, fullPath, FALSE)) {
-                DWORD err = GetLastError();
-                wchar_t buf[512];
-                swprintf_s(buf, 512, L"Failed to copy file to:\n%ls\nError %lu", fullPath, err);
-                MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+        wchar_t tempPath[MAX_PATH] = L"";
+        for (size_t j = 0; j < wcslen(expandedFolder); j++) {
+            tempPath[j] = expandedFolder[j];
+            tempPath[j + 1] = 0;
+            if (expandedFolder[j] == L'\\') {
+                if (GetFileAttributesW(tempPath) == INVALID_FILE_ATTRIBUTES)
+                    CreateDirectoryW(tempPath, NULL);
             }
         }
+
+        wchar_t fullPath[MAX_PATH];
+        swprintf_s(fullPath, MAX_PATH, L"%s%s", expandedFolder, finalFile);
+        MakeUniqueFilename(fullPath, fullPath);
+
+        if (!CopyFileW(oldFile, fullPath, FALSE)) {
+            DWORD err = GetLastError();
+            wchar_t buf[512];
+            swprintf_s(buf, 512, L"Failed to copy file to:\n%ls\nError %lu", fullPath, err);
+            MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+        }
     }
+
     DeleteFileW(oldFile);
 }
+
 
 
 
