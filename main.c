@@ -32,6 +32,15 @@ HWND nameBox = NULL;
 HWND poBox = NULL;
 HWND hButton = NULL;
 
+wchar_t key[32];
+wchar_t filePattern[256];
+wchar_t finalFile[256];
+wchar_t folderValue[256];
+wchar_t expandedFolder[512];
+wchar_t fullFolder[MAX_PATH];
+wchar_t folderCheck[MAX_PATH];
+wchar_t fullPath[MAX_PATH];
+
 
 typedef enum {
     FIELD_LABEL,
@@ -449,16 +458,13 @@ void ExpandTemplate(const wchar_t* input, wchar_t* output, size_t outSize, FIELD
 
 
 
-void SaveFile(int currentPage)
-{
+void SaveFile(int currentPage) {
     if (currentPage < 0 || currentPage >= PAGE_COUNT) return;
 
     TAB_DATA* tab = &Tabs[currentPage];
 
-
     FIELD_VALUE fieldValues[64];
     int fieldCount = 0;
-
     for (int i = 0; i < tab->fieldCount; i++) {
         FIELD_DATA* f = &tab->fields[i];
         if (!f->hControl) continue;
@@ -468,89 +474,71 @@ void SaveFile(int currentPage)
         fieldCount++;
     }
 
-
     wchar_t baseFolder[MAX_PATH] = L"";
     GetPrivateProfileStringW(L"Save", L"BaseFolder", L"", baseFolder, MAX_PATH, INI_PATH);
 
-    wchar_t fullFolder[MAX_PATH];
-    wcscpy_s(fullFolder, MAX_PATH, baseFolder);
-
-    if (fullFolder[wcslen(fullFolder) - 1] != L'\\')
-        wcscat_s(fullFolder, MAX_PATH, L"\\");
-
-
-    wchar_t folderTemplate[256];
-    wchar_t expandedFolder[512];
-
-    for (int i = 1; i < 100; i++) {
-        wchar_t key[32];
-        swprintf_s(key, 32, L"Folder%d", i);
-        GetPrivateProfileStringW(tab->iniSection, key, L"", folderTemplate, 256, INI_PATH);
-        if (folderTemplate[0] == 0) break;
-
-        ExpandTemplate(folderTemplate, expandedFolder, 512, fieldValues, fieldCount);
-
-        wcscat_s(fullFolder, MAX_PATH, expandedFolder);
-
-        if (fullFolder[wcslen(fullFolder) - 1] != L'\\')
-            wcscat_s(fullFolder, MAX_PATH, L"\\");
-    }
-
-
-    wchar_t fileTemplate[256];
-    wchar_t finalFile[256];
-
-    GetPrivateProfileStringW(tab->iniSection, L"SaveFileName", L"", fileTemplate, 256, INI_PATH);
-
-    if (fileTemplate[0] != 0)
-        ExpandTemplate(fileTemplate, finalFile, 256, fieldValues, fieldCount);
-    else
-        wcscpy_s(finalFile, 256, g_CurrentFilename);
-
-
-    wchar_t folderCheck[MAX_PATH];
-    for (size_t i = 0; i < wcslen(fullFolder); i++) {
-        folderCheck[i] = fullFolder[i];
-        folderCheck[i + 1] = 0;
-
-        if (fullFolder[i] == L'\\') {
-            if (GetFileAttributesW(folderCheck) == INVALID_FILE_ATTRIBUTES) {
-                if (!CreateDirectoryW(folderCheck, NULL)) {
-                    DWORD err = GetLastError();
-                    wchar_t buf[256];
-                    swprintf_s(buf, 256, L"Failed to create folder: %s\nError %lu", folderCheck, err);
-                    MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
-                    return;
-                }
-            }
-        }
-    }
-
-
-    wchar_t fullPath[MAX_PATH];
-    swprintf_s(fullPath, MAX_PATH, L"%s%s", fullFolder, finalFile);
-
-
-    MakeUniqueFilename(fullPath, fullPath);
-
     wchar_t oldFile[MAX_PATH];
     swprintf_s(oldFile, MAX_PATH, L"C:\\watchFolder\\%s", g_CurrentFilename);
-
     if (GetFileAttributesW(oldFile) == INVALID_FILE_ATTRIBUTES) {
         MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
         return;
     }
 
-    if (!MoveFileExW(oldFile, fullPath, MOVEFILE_REPLACE_EXISTING)) {
-        DWORD err = GetLastError();
-        wchar_t buf[512];
-        swprintf_s(buf, 512, L"Failed to move file to:\n%s\nError %lu", fullPath, err);
-        MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
-        return;
+    for (int i = 1; i <= 10; i++) {
+        wchar_t key[32], filePattern[256], finalFile[256];
+        swprintf_s(key, 32, L"SavedFileName%d", i);
+        GetPrivateProfileStringW(tab->iniSection, key, L"", filePattern, 256, INI_PATH);
+        if (filePattern[0] == 0) continue;
+
+        ExpandTemplate(filePattern, finalFile, 256, fieldValues, fieldCount);
+
+        for (int p = 1; p <= 10; p++) {
+            wchar_t pathKey[32], folderTemplate[512], expandedFolder[512];
+            swprintf_s(pathKey, 32, L"Path%d", p);
+            GetPrivateProfileStringW(tab->iniSection, pathKey, L"", folderTemplate, 512, INI_PATH);
+            if (folderTemplate[0] == 0) break;
+
+            ExpandTemplate(folderTemplate, expandedFolder, 512, fieldValues, fieldCount);
+
+            wchar_t fullFolder[MAX_PATH];
+            if ((expandedFolder[1] == L':' && expandedFolder[2] == L'\\') ||
+                (expandedFolder[0] == L'\\' && expandedFolder[1] == L'\\')) {
+                wcscpy_s(fullFolder, MAX_PATH, expandedFolder);
+            } else {
+                wcscpy_s(fullFolder, MAX_PATH, baseFolder);
+                if (fullFolder[wcslen(fullFolder)-1] != L'\\')
+                    wcscat_s(fullFolder, MAX_PATH, L"\\");
+                wcscat_s(fullFolder, MAX_PATH, expandedFolder);
+            }
+
+            if (fullFolder[wcslen(fullFolder)-1] != L'\\')
+                wcscat_s(fullFolder, MAX_PATH, L"\\");
+
+            wchar_t tempPath[MAX_PATH] = L"";
+            for (size_t j = 0; j < wcslen(fullFolder); j++) {
+                tempPath[j] = fullFolder[j];
+                tempPath[j+1] = 0;
+                if (fullFolder[j] == L'\\') {
+                    if (GetFileAttributesW(tempPath) == INVALID_FILE_ATTRIBUTES)
+                        CreateDirectoryW(tempPath, NULL);
+                }
+            }
+
+            wchar_t fullPath[MAX_PATH];
+            swprintf_s(fullPath, MAX_PATH, L"%s%s", fullFolder, finalFile);
+            MakeUniqueFilename(fullPath, fullPath);
+
+
+            if (!CopyFileW(oldFile, fullPath, FALSE)) {
+                DWORD err = GetLastError();
+                wchar_t buf[512];
+                swprintf_s(buf, 512, L"Failed to copy file to:\n%ls\nError %lu", fullPath, err);
+                MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+            }
+        }
     }
-
+    DeleteFileW(oldFile);
 }
-
 
 
 
@@ -636,7 +624,7 @@ DWORD WINAPI WatchFolder(LPVOID lpParam) {
     );
 
     if (hDir == INVALID_HANDLE_VALUE) {
-        MessageBox(hwndParent, L"Failed to open folder", L"Error", MB_OK);
+        MessageBox(hwndParent, L"Failed to open Watch Folder", L"Error", MB_OK);
         return 1;
     }
 
@@ -914,11 +902,6 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
                     SaveFile(currentPage);
 
-
-
-                    wchar_t buf[256];
-                    swprintf_s(buf, 256, L"File saved successfully!");
-                    MessageBox(hwnd, buf, L"Success", MB_OK);
 
                     DestroyWindow(hwnd);
 
