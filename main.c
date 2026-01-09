@@ -50,7 +50,7 @@ typedef struct
     wchar_t value[256];
 
 
-    int x;
+    u_int x;
     int y;
 
     HWND hControl;
@@ -62,9 +62,16 @@ typedef struct
     wchar_t name[64];
     wchar_t type[16];
 
+
+    wchar_t iniSection[64];
     FIELD_DATA fields[16];
     u_int fieldCount;
 } TAB_DATA;
+
+typedef struct {
+    wchar_t label[64];
+    wchar_t value[256];
+} FIELD_VALUE;
 
 LPCWSTR INI_PATH = L"C:\\watchFolder\\settings.ini";
 
@@ -134,7 +141,7 @@ u_int LoadTabCount(void)
 
 
 
-void PopulateControlData(FIELD_DATA* f)
+void PopulateControlData(const FIELD_DATA* f)
 {
     if (!f->hControl || f->controlType != FIELD_COMBO)
         return;
@@ -214,11 +221,16 @@ void LoadTabsFromIni(HWND hTab)
         wchar_t section[16];
         swprintf_s(section, 16, L"Tab%d", i);
 
+        swprintf_s(Tabs[i].iniSection, 64, L"Tab%d", i);
+
+
         GetPrivateProfileStringW(section, L"Name", L"Unnamed",
             Tabs[i].name, 64, INI_PATH);
 
         GetPrivateProfileStringW(section, L"Type", L"",
             Tabs[i].type, 16, INI_PATH);
+
+
 
         LoadTabFields(i, section);
 
@@ -242,8 +254,9 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
 {
     DestroyActiveFields();
 
-    int xCtrl  = 50;
     int y = 50;
+    int xCtrl  = 50;
+
 
     RECT rc;
     GetClientRect(hPopupTab, &rc);
@@ -413,124 +426,128 @@ void MakeUniqueFilename(wchar_t* destPath, const wchar_t* basePath) {
     }
 }
 
+void ExpandTemplate(const wchar_t* input, wchar_t* output, size_t outSize, FIELD_VALUE* fields, int fieldCount) {
+    wcscpy_s(output, outSize, input);
+
+    for (int i = 0; i < fieldCount; i++) {
+        wchar_t token[128];
+        swprintf_s(token, 128, L"{Field:%s}", fields[i].label);
+
+        wchar_t* pos;
+        while ((pos = wcsstr(output, token)) != NULL) {
+            wchar_t temp[MAX_PATH];
+            wcscpy_s(temp, MAX_PATH, pos + wcslen(token));
+            *pos = 0;
+            wcscat_s(output, outSize, fields[i].value);
+            wcscat_s(output, outSize, temp);
+        }
+    }
+}
 
 
 
 
-void SaveFile(int currentPage) {
+
+
+void SaveFile(int currentPage)
+{
     if (currentPage < 0 || currentPage >= PAGE_COUNT) return;
 
     TAB_DATA* tab = &Tabs[currentPage];
 
-    wchar_t oldFilename[MAX_PATH];
-    swprintf_s(oldFilename, MAX_PATH, L"C:\\watchFolder\\%s", g_CurrentFilename);
-    CharUpperBuffW(oldFilename, wcslen(oldFilename));
 
-    if (GetFileAttributesW(oldFilename) == INVALID_FILE_ATTRIBUTES) {
-        MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
-        return;
-    }
-
-    wchar_t destination[MAX_PATH] = L"C:\\Users\\12096\\DropBox\\Harrison's DropBox\\";
-    wchar_t filename[256] = L"";
-
-    wchar_t nameText[128] = L"";
-    wchar_t poText[128] = L"";
-    wchar_t yearText[64] = L"";
-    wchar_t monthText[64] = L"";
-    wchar_t companyText[128] = L"";
+    FIELD_VALUE fieldValues[64];
+    int fieldCount = 0;
 
     for (int i = 0; i < tab->fieldCount; i++) {
         FIELD_DATA* f = &tab->fields[i];
         if (!f->hControl) continue;
 
-        wchar_t temp[256] = L"";
-        GetWindowText(f->hControl, temp, 256);
+        wcscpy_s(fieldValues[fieldCount].label, 64, f->label);
+        GetWindowTextW(f->hControl, fieldValues[fieldCount].value, 256);
+        fieldCount++;
+    }
 
-        if (_wcsicmp(f->label, L"Customer Name") == 0 ||
-            _wcsicmp(f->label, L"Invoice Date") == 0) {
-            wcscpy_s(nameText, 128, temp);
-        }
-        else if (_wcsicmp(f->label, L"PO Number") == 0) {
-            wcscpy_s(poText, 128, temp);
-        }
-        else if (_wcsicmp(f->label, L"Current Year") == 0) {
-            wcscpy_s(yearText, 64, temp);
-        }
-        else if (_wcsicmp(f->label, L"Current Month") == 0) {
-            wcscpy_s(monthText, 64, temp);
-        }
-        else if (_wcsicmp(f->label, L"Company") == 0) {
-            wcscpy_s(companyText, 128, temp);
+
+    wchar_t baseFolder[MAX_PATH] = L"";
+    GetPrivateProfileStringW(L"Save", L"BaseFolder", L"", baseFolder, MAX_PATH, INI_PATH);
+
+    wchar_t fullFolder[MAX_PATH];
+    wcscpy_s(fullFolder, MAX_PATH, baseFolder);
+
+    if (fullFolder[wcslen(fullFolder) - 1] != L'\\')
+        wcscat_s(fullFolder, MAX_PATH, L"\\");
+
+
+    wchar_t folderTemplate[256];
+    wchar_t expandedFolder[512];
+
+    for (int i = 1; i < 100; i++) {
+        wchar_t key[32];
+        swprintf_s(key, 32, L"Folder%d", i);
+        GetPrivateProfileStringW(tab->iniSection, key, L"", folderTemplate, 256, INI_PATH);
+        if (folderTemplate[0] == 0) break;
+
+        ExpandTemplate(folderTemplate, expandedFolder, 512, fieldValues, fieldCount);
+
+        wcscat_s(fullFolder, MAX_PATH, expandedFolder);
+
+        if (fullFolder[wcslen(fullFolder) - 1] != L'\\')
+            wcscat_s(fullFolder, MAX_PATH, L"\\");
+    }
+
+
+    wchar_t fileTemplate[256];
+    wchar_t finalFile[256];
+
+    GetPrivateProfileStringW(tab->iniSection, L"SaveFileName", L"", fileTemplate, 256, INI_PATH);
+
+    if (fileTemplate[0] != 0)
+        ExpandTemplate(fileTemplate, finalFile, 256, fieldValues, fieldCount);
+    else
+        wcscpy_s(finalFile, 256, g_CurrentFilename);
+
+
+    wchar_t folderCheck[MAX_PATH];
+    for (size_t i = 0; i < wcslen(fullFolder); i++) {
+        folderCheck[i] = fullFolder[i];
+        folderCheck[i + 1] = 0;
+
+        if (fullFolder[i] == L'\\') {
+            if (GetFileAttributesW(folderCheck) == INVALID_FILE_ATTRIBUTES) {
+                if (!CreateDirectoryW(folderCheck, NULL)) {
+                    DWORD err = GetLastError();
+                    wchar_t buf[256];
+                    swprintf_s(buf, 256, L"Failed to create folder: %s\nError %lu", folderCheck, err);
+                    MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+                    return;
+                }
+            }
         }
     }
 
-    switch (currentPage) {
-        case 0:
-            wcscat_s(filename, 256, nameText);
-            wcscat_s(filename, 256, L" #");
-            wcscat_s(filename, 256, poText);
-            wcscat_s(filename, 256, L".pdf");
-
-
-            wcscat_s(destination, MAX_PATH, yearText);
-            wcscat_s(destination, MAX_PATH, L"\\Job Tickets ");
-            wcscat_s(destination, MAX_PATH, yearText);
-            wcscat_s(destination, MAX_PATH, L"\\");
-            break;
-
-        case 1:
-            wcscat_s(filename, 256, nameText);
-            wcscat_s(filename, 256, L".pdf");
-
-            wcscat_s(destination, MAX_PATH, yearText);
-            wcscat_s(destination, MAX_PATH, L"\\Invoices ");
-            wcscat_s(destination, MAX_PATH, yearText);
-            wcscat_s(destination, MAX_PATH, L"\\");
-            wcscat_s(destination, MAX_PATH, monthText);
-            wcscat_s(destination, MAX_PATH, L"\\");
-            break;
-
-        case 2:
-            wcscat_s(filename, 256, companyText);
-            wcscat_s(filename, 256, L".pdf");
-
-            wcscat_s(destination, MAX_PATH, yearText);
-            wcscat_s(destination, MAX_PATH, L"\\Parts Receipts ");
-            wcscat_s(destination, MAX_PATH, yearText);
-            wcscat_s(destination, MAX_PATH, L"\\");
-            wcscat_s(destination, MAX_PATH, monthText);
-            wcscat_s(destination, MAX_PATH, L"\\");
-            break;
-
-        default:
-            MessageBox(NULL, L"Unknown tab type!", L"Error", MB_OK | MB_ICONERROR);
-            return;
-    }
 
     wchar_t fullPath[MAX_PATH];
-    swprintf_s(fullPath, MAX_PATH, L"%s%s", destination, filename);
+    swprintf_s(fullPath, MAX_PATH, L"%s%s", fullFolder, finalFile);
+
 
     MakeUniqueFilename(fullPath, fullPath);
 
-    if (GetFileAttributesW(destination) == INVALID_FILE_ATTRIBUTES) {
-        if (!CreateDirectoryW(destination, NULL)) {
-            DWORD err = GetLastError();
-            wchar_t buf[256];
-            swprintf_s(buf, 256, L"Failed to create folder: %ls (Error %lu)", destination, err);
-            MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
-            return;
-        }
-    }
+    wchar_t oldFile[MAX_PATH];
+    swprintf_s(oldFile, MAX_PATH, L"C:\\watchFolder\\%s", g_CurrentFilename);
 
-    if (!MoveFileExW(oldFilename, fullPath, MOVEFILE_REPLACE_EXISTING)) {
-        DWORD err = GetLastError();
-        wchar_t buf[256];
-        swprintf_s(buf, 256, L"Failed to move file to: %ls (Error %lu)", fullPath, err);
-        MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+    if (GetFileAttributesW(oldFile) == INVALID_FILE_ATTRIBUTES) {
+        MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
         return;
     }
 
+    if (!MoveFileExW(oldFile, fullPath, MOVEFILE_REPLACE_EXISTING)) {
+        DWORD err = GetLastError();
+        wchar_t buf[512];
+        swprintf_s(buf, 512, L"Failed to move file to:\n%s\nError %lu", fullPath, err);
+        MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+        return;
+    }
 
 }
 
@@ -926,7 +943,7 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             hButton = CreateWindow(
                        L"BUTTON",
-                       L"Send",
+                       L"Save",
                        WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
                        550,
                        70,
@@ -1037,10 +1054,10 @@ int WINAPI WinMain(
     g_hInstance = hInstance;
 
 
-    INITCOMMONCONTROLSEX icex = {0};
-    icex.dwSize = sizeof(icex);
-    icex.dwICC = ICC_STANDARD_CLASSES | ICC_WIN95_CLASSES;
-    InitCommonControlsEx(&icex);
+    INITCOMMONCONTROLSEX initControls = {0};
+    initControls.dwSize = sizeof(initControls);
+    initControls.dwICC = ICC_STANDARD_CLASSES | ICC_WIN95_CLASSES;
+    InitCommonControlsEx(&initControls);
 
 
 
