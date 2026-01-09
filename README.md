@@ -1,7 +1,7 @@
 # FileWarden
 This lightweight WIN32 Application enhances your printer's scanning capabilities. With this tool you can go far beyond the default scanner settings:
-- Support for multiple custom save locations, organizing scans by date or any criteria,
-- Allows scanned files to be saved to multiple locations at once (excellent for database and local congruency),
+- Support for multiple custom directorys for file saving, organizing scanned documents by date or any criteria,
+- Allows scanned documents to be saved to multiple locations at once (excellent for database and local congruency),
 - Allows custom filenames to create structure in your directorys.
 
 
@@ -10,9 +10,9 @@ How to customize for you and your company:
 
 
 Important notes before downloading:
-- If you work for a company that scans hundreds or thousands of files, then this app is for you. Don't let your folders get cluttered because you don't have time to figure out a structure. Create the structure once and enjoy having a cleaner filesystem.
+- If you work for a company that scans hundreds or thousands of documents, then this app is for you. Don't let your folders get cluttered because you don't have time to figure out a structure. Create the structure once and enjoy having a cleaner file system.
 - This application is meant to run in the background on startup.
-- When watchFolder is updated with a pdf, it will open a window so you can customize your filename and file save location.
+- When watchFolder is updated with a pdf, it will open a window so you can customize your filename and directory names.
 
 
 Application info:
