@@ -1,7 +1,7 @@
 # FileWarden
 This lightweight WIN32 Application enhances your printer's scanning capabilities. With this tool you can go far beyond the default scanner settings:
 - Support for multiple custom save locations, organizing scans by date or any criteria,
-- Allows scanned files to be saved to multiple locations at once,
+- Allows scanned files to be saved to multiple locations at once (excellent for database and local congruency),
 - Allows custom filenames to create structure in your directorys.
 
 
