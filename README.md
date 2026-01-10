@@ -17,5 +17,5 @@ Important notes before downloading:
 
 Benchmark info:
 - Exe file size is about 80 kilobytes.
-- Runtime memory usage stays between 2 and 15 megabytes while open 24/7.
+- Runtime memory usage stays between 2-15 megabytes while open 24/7.
 
