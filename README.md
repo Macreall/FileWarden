@@ -15,7 +15,7 @@ Important notes before downloading:
 - When watchFolder is updated with a pdf, it will open a window so you can customize your filename and directory names.
 
 
-Application info:
-- Release file is about 80 kilobytes of data
-- Runtime memory usage is about 10 megabytes.
+Benchmark info:
+- Exe file size is about 80 kilobytes.
+- Runtime memory usage stays between 2 and 15 megabytes while open 24/7.
 
