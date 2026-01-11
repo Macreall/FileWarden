@@ -8,9 +8,9 @@ This lightweight WIN32 Application enhances any printer's scanning capabilities.
 
 
 ## Configurable options include the following:  
-1. ***Amount of save locations,***
-2. ***UI component control,***
-3. ***Custom or default naming conventions for save paths and file names,***
+- ***Amount of save locations,***
+- ***UI component control,***
+- ***Custom or default naming conventions for save paths and file names,***
 
 
 ## Important notes before downloading:
