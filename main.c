@@ -20,16 +20,7 @@ HWND hSettingsWnd = NULL;
 HWND hSettingsTab = NULL;
 
 HINSTANCE g_hInstance = NULL;
-HWND monthComboBox = NULL;
-HWND yearComboBox = NULL;
-HWND companiesComboBox = NULL;
 
-HWND hLabel1 = NULL;
-HWND hLabel2 = NULL;
-HWND hMonthLabel = NULL;
-HWND hYearLabel = NULL;
-HWND nameBox = NULL;
-HWND poBox = NULL;
 HWND hButton = NULL;
 
 wchar_t key[32];
@@ -729,7 +720,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
             wcsncpy_s(g_CurrentFilename, MAX_PATH, filename, _TRUNCATE);
             OpenPopupWindow(hwnd, g_CurrentFilename);
-            LoadFromIni(yearComboBox, L"Years");
             free(filename);
         } break;
 
