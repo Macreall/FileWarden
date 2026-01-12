@@ -96,6 +96,8 @@ u_int PAGE_COUNT = 0;
 void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent);
 void CreateFieldsFromTab(HWND parent, TAB_DATA* tab);
 HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text);
+void OpenSettings();
+
 
 
 
@@ -746,7 +748,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     DestroyWindow(hwnd);
                     break;
             case ID_TRAY_SETTINGS:
-                    OpenSettingsWindow(g_hInstance, hwnd);
+                    OpenSettings(hwnd);
                     break;
 
 
@@ -807,6 +809,17 @@ void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent) {
 
         UpdateWindow(hSettingsWnd);
     }
+}
+
+void OpenSettings(HWND hwnd) {
+    ShellExecute(
+    hwnd,
+    L"open",
+    L"notepad.exe",
+    INI_PATH,
+    NULL,
+    SW_SHOWNORMAL
+);
 }
 
 LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
