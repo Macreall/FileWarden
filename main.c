@@ -3,6 +3,7 @@
 #include <commctrl.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include "resources.h"
 
 
 
@@ -762,7 +763,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_DESTROY:
             Shell_NotifyIcon(NIM_DELETE, &nid);
-            // DestroyIcon(nid.hIcon);
+            DestroyIcon(nid.hIcon);
             hSettingsWnd = NULL;
             PostQuitMessage(0);
             break;
@@ -1028,6 +1029,19 @@ int WINAPI WinMain(
     const wchar_t CLASS_NAME[] = L"TrayAppClass";
     g_hInstance = hInstance;
 
+    HICON hIcon = (HICON)LoadImage(
+        hInstance,
+        MAKEINTRESOURCE(IDI_TRAY),
+        IMAGE_ICON,
+        GetSystemMetrics(SM_CXSMICON),
+        GetSystemMetrics(SM_CYSMICON),
+        LR_DEFAULTCOLOR
+    );
+
+    if (!hIcon) {
+        MessageBox(NULL, L"Icon has failed to load", L"Error", MB_OK);
+    }
+
 
     INITCOMMONCONTROLSEX initControls = {0};
     initControls.dwSize = sizeof(initControls);
@@ -1069,12 +1083,16 @@ int WINAPI WinMain(
     nid.hWnd = hwnd;
     nid.uID = 1;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    nid.hIcon = hIcon;
     nid.uCallbackMessage = WM_TRAYICON;
     wcscpy_s(nid.szTip, sizeof(nid.szTip), L"File Warden");
 
 
 
     Shell_NotifyIcon(NIM_ADD, &nid);
+
+    nid.uVersion = NOTIFYICON_VERSION;
+    Shell_NotifyIcon(NIM_SETVERSION, &nid);
 
 
     MSG msg;
