@@ -54,6 +54,9 @@ typedef struct
     u_int x;
     int y;
 
+    u_int width;
+    u_int height;
+
     HWND hControl;
 
 } FIELD_DATA;
@@ -198,6 +201,12 @@ void LoadTabFields(int tabIndex, const wchar_t* section)
         swprintf_s(key, 64, L"Field%d.Y", f);
         field->y = GetPrivateProfileIntW(section, key, -1, INI_PATH);
 
+        swprintf_s(key, 64, L"Field%d.Width", f);
+        field->width = GetPrivateProfileIntW(section, key, -1, INI_PATH);
+
+        swprintf_s(key, 64, L"Field%d.Height", f);
+        field->height = GetPrivateProfileIntW(section, key, -1, INI_PATH);
+
         if (!_wcsicmp(ctrl, L"EDIT")) field->controlType = FIELD_EDIT;
         else if (!_wcsicmp(ctrl, L"COMBO")) field->controlType = FIELD_COMBO;
         else if (!_wcsicmp(ctrl, L"CHECKBOX")) field->controlType = FIELD_CHECKBOX;
@@ -260,6 +269,9 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
     int y = 50;
     int xCtrl  = 50;
 
+    int widthCtrl = 150;
+    int heightCtrl = 20;
+
 
     RECT rc;
     GetClientRect(hPopupTab, &rc);
@@ -276,6 +288,10 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
 
         int drawX = baseX + ((f->x != -1) ? f->x : xCtrl);
         int drawY = baseY + ((f->y != -1) ? f->y : y);
+
+        int drawWidth = drawX + f->width ? f->width : widthCtrl;
+        int drawHeight = drawY + f->height ? f->height : heightCtrl;
+
 
 
 
@@ -300,7 +316,7 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
                     L"",
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
                     drawX, drawY,
-                    180, 22,
+                    drawWidth, drawHeight,
                     parent,
                     NULL,
                     g_hInstance,
@@ -315,7 +331,7 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
                     L"",
                     WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL,
                     drawX, drawY,
-                    200, 230,
+                    drawWidth, drawHeight,
                     parent,
                     NULL,
                     g_hInstance,
@@ -330,7 +346,7 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
                     f->label,
                     WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                     xCtrl, y,
-                    200, 22,
+                    drawWidth, drawHeight,
                     parent,
                     NULL,
                     g_hInstance,
