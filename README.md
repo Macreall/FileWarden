@@ -1,10 +1,8 @@
 # FileWarden
 This lightweight WIN32 Application enhances any printer's scanning capabilities. With this tool you can go far beyond any default scanner settings: 
-- ***Allows custom naming conventions for save paths which can organize scanned files by any criteria desired,***
-- ***Allows scanned documents to have unlimited default save paths, rather than the default 1-4 save paths,***
+- ***Allows custom naming conventions for save paths and scanned documents giving you the ability to organize scans by any criteria desired,***
+- ***Allows scanned documents to have unlimited save paths, rather than the default 1-4 a normal scanner would have,***
 - ***Allows a scanned document to be saved to multiple locations at once,***
-- ***Allows custom file naming giving complete control over structure,***
-- ***Configurable options you set up once.***
 
 
 ## Configurable options include the following:  
