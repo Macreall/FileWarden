@@ -470,14 +470,14 @@ void SaveFile(int currentPage) {
     wchar_t oldFile[MAX_PATH];
     swprintf_s(oldFile, MAX_PATH, L"C:\\watchFolder\\%s", g_CurrentFilename);
     if (GetFileAttributesW(oldFile) == INVALID_FILE_ATTRIBUTES) {
-        MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR);
+        MessageBox(NULL, L"Source file not found!", L"Error", MB_OK | MB_ICONERROR | MB_TOPMOST);
         return;
     }
 
     wchar_t filePattern[256], finalFile[256];
     GetPrivateProfileStringW(tab->iniSection, L"SavedFileName", L"", filePattern, 256, INI_PATH);
     if (filePattern[0] == 0) {
-        MessageBox(NULL, L"No SavedFileName defined!", L"Error", MB_OK | MB_ICONERROR);
+        MessageBox(NULL, L"No SavedFileName defined!", L"Error", MB_OK | MB_ICONERROR | MB_TOPMOST);
         return;
     }
     ExpandTemplate(filePattern, finalFile, 256, fieldValues, fieldCount);
@@ -511,7 +511,10 @@ void SaveFile(int currentPage) {
             DWORD err = GetLastError();
             wchar_t buf[512];
             swprintf_s(buf, 512, L"Failed to copy file to:\n%ls\nError %lu", fullPath, err);
-            MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR);
+            MessageBox(NULL, buf, L"Error", MB_OK | MB_ICONERROR | MB_TOPMOST);
+        }
+        else {
+            MessageBox(NULL, L"File Saved Successfully!", L"Success", MB_OK | MB_TOPMOST);
         }
     }
 
