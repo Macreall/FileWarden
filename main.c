@@ -17,8 +17,7 @@
 
 HWND hPopupTab = NULL;
 HWND hPopupWnd = NULL;
-HWND hSettingsWnd = NULL;
-HWND hSettingsTab = NULL;
+
 
 HINSTANCE g_hInstance = NULL;
 
@@ -53,9 +52,10 @@ typedef struct
 
     u_int x;
     int y;
-
     u_int width;
     u_int height;
+
+    wchar_t placeholder[256];
 
     HWND hControl;
 
@@ -97,10 +97,10 @@ WCHAR g_CurrentFilename[MAX_PATH];
 u_int PAGE_COUNT = 0;
 
 
-void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent);
 void CreateFieldsFromTab(HWND parent, TAB_DATA* tab);
 HWND OpenPopupWindow(HWND hwndParent, LPCWSTR text);
 void OpenSettings();
+
 
 
 
@@ -128,7 +128,7 @@ void LoadLabelsFromIni() {
             L"Unnamed",
             name,
             64,
-            L"C:\\watchFolder\\settings.ini"
+            INI_PATH
         );
 }
 
@@ -138,7 +138,7 @@ u_int LoadTabCount(void)
         L"Tabs",
         L"Count",
         0,
-        L"C:\\watchFolder\\settings.ini"
+        INI_PATH
     );
 }
 
@@ -195,6 +195,9 @@ void LoadTabFields(int tabIndex, const wchar_t* section)
         GetPrivateProfileStringW(section, key, L"",
             ctrl, 32, INI_PATH);
 
+        swprintf_s(key, 64, L"Field%d.Placeholder", f);
+        GetPrivateProfileStringW(section, key, L"", field->placeholder, 32, INI_PATH);
+
         swprintf_s(key, 64, L"Field%d.X", f);
         field->x = GetPrivateProfileIntW(section, key, -1, INI_PATH);
 
@@ -206,6 +209,10 @@ void LoadTabFields(int tabIndex, const wchar_t* section)
 
         swprintf_s(key, 64, L"Field%d.Height", f);
         field->height = GetPrivateProfileIntW(section, key, -1, INI_PATH);
+
+
+
+
 
         if (!_wcsicmp(ctrl, L"EDIT")) field->controlType = FIELD_EDIT;
         else if (!_wcsicmp(ctrl, L"COMBO")) field->controlType = FIELD_COMBO;
@@ -289,8 +296,8 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
         int drawX = baseX + ((f->x != -1) ? f->x : xCtrl);
         int drawY = baseY + ((f->y != -1) ? f->y : y);
 
-        int drawWidth = drawX + f->width ? f->width : widthCtrl;
-        int drawHeight = drawY + f->height ? f->height : heightCtrl;
+        int drawWidth  = (f->width != -1) ? f->width : widthCtrl;
+        int drawHeight = (f->height != -1) ? f->height : heightCtrl;
 
 
 
@@ -322,6 +329,7 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
                     g_hInstance,
                     NULL
                 );
+
                 y += 50;
                 break;
 
@@ -356,6 +364,8 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
                 break;
             default: ;
         }
+
+
 
         if (f->controlType == FIELD_COMBO)
         {
@@ -407,7 +417,7 @@ void LoadFromIni(HWND comboBox, LPCWSTR text) {
             L"",
             value,
             64,
-            L"C:\\watchFolder\\settings.ini"
+            INI_PATH
         );
 
         if (value[0] == L'\0')
@@ -668,57 +678,6 @@ DWORD WINAPI WatchFolder(LPVOID lpParam) {
 
 
 
-LRESULT CALLBACK SettingsWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    switch (msg) {
-        case WM_CLOSE:
-            DestroyWindow(hwnd);
-            break;
-        case WM_DESTROY:
-            Shell_NotifyIcon(NIM_DELETE, &nid);
-            hSettingsWnd = NULL;
-            PostQuitMessage(0);
-            break;
-
-        case WM_ERASEBKGND:
-        {
-            HDC hdc = (HDC)wParam;
-            RECT rc;
-            GetClientRect(hwnd, &rc);
-            HBRUSH hBrush = CreateSolidBrush(RGB(148, 148, 148));
-            FillRect(hdc, &rc, hBrush);
-            DeleteObject(hBrush);
-            return 1;
-        }
-
-        case WM_CREATE:
-        {
-            hButton = CreateWindow(
-                       L"BUTTON",
-                       L"Send",
-                       WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-                       550,
-                       70,
-                       60,
-                       30,
-                       hwnd,
-                       (HMENU)IDC_SAVE_BUTTON,
-                       (HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
-                       NULL);
-
-            ShowWindow(hButton, SW_SHOW);
-
-
-
-
-
-        }
-            break;
-        default:
-            return DefWindowProc(hwnd, msg, wParam, lParam);
-    }
-    return 0;
-}
-
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -751,7 +710,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
                 AppendMenu(menu, MF_STRING, ID_TRAY_SETTINGS, L"Settings");
                 AppendMenu(menu, MF_SEPARATOR, 0, NULL);
-                AppendMenu(menu, MF_STRING, ID_TRAY_EXIT, L"Exit");
+                AppendMenu(menu, MF_STRING, ID_TRAY_EXIT, L"Quit");
 
                 POINT p;
                 GetCursorPos(&p);
@@ -780,7 +739,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_DESTROY:
             Shell_NotifyIcon(NIM_DELETE, &nid);
             DestroyIcon(nid.hIcon);
-            hSettingsWnd = NULL;
             PostQuitMessage(0);
             break;
         default:
@@ -788,47 +746,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
     }
     return 0;
-}
-
-void OpenSettingsWindow(HINSTANCE hInstance, HWND hwndParent) {
-    if (hSettingsWnd != NULL) {
-
-        SetForegroundWindow(hSettingsWnd);
-        return;
-    }
-
-    const wchar_t CLASS_NAME[] = L"SettingsWindowClass";
-
-    WNDCLASS wc;
-    ZeroMemory(&wc, sizeof(wc));
-    wc.lpfnWndProc = SettingsWndProc;
-    wc.hInstance = hInstance;
-    wc.hbrBackground = CreateSolidBrush(RGB(148, 148, 148));
-    wc.lpszClassName = CLASS_NAME;
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-
-    RegisterClass(&wc);
-
-    hSettingsWnd = CreateWindowEx(
-        0,
-        CLASS_NAME,
-        L"Settings",
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
-        400, 200, 700, 450,
-        hwndParent,
-        NULL,
-        hInstance,
-        NULL
-    );
-
-
-    if (hSettingsWnd) {
-        ShowWindow(hSettingsWnd, SW_SHOW);
-
-
-
-        UpdateWindow(hSettingsWnd);
-    }
 }
 
 void OpenSettings(HWND hwnd) {
@@ -854,7 +771,6 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         case WM_KEYDOWN:
         {
             HWND hTab =
-                (hwnd == hSettingsWnd) ? hSettingsTab :
                 (hwnd == hPopupWnd)    ? hPopupTab    :
                 NULL;
 
@@ -1117,13 +1033,8 @@ int WINAPI WinMain(
         HWND ownerWnd = NULL;
         HWND activeTab = NULL;
 
-        if (hSettingsWnd && msg.hwnd &&
-            (msg.hwnd == hSettingsWnd || IsChild(hSettingsWnd, msg.hwnd)))
-        {
-            ownerWnd = hSettingsWnd;
-            activeTab = hSettingsTab;
-        }
-        else if (hPopupWnd && msg.hwnd &&
+
+        if (hPopupWnd && msg.hwnd &&
             (msg.hwnd == hPopupWnd || IsChild(hPopupWnd, msg.hwnd)))
         {
             ownerWnd = hPopupWnd;
