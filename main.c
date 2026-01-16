@@ -17,11 +17,10 @@
 
 HWND hPopupTab = NULL;
 HWND hPopupWnd = NULL;
-
+HWND hButton = NULL;
 
 HINSTANCE g_hInstance = NULL;
 
-HWND hButton = NULL;
 
 wchar_t key[32];
 wchar_t filePattern[256];
@@ -37,7 +36,8 @@ typedef enum {
     FIELD_LABEL,
     FIELD_EDIT,
     FIELD_COMBO,
-    FIELD_CHECKBOX
+    FIELD_CHECKBOX,
+    FIELD_BUTTON,
 } CONTROL_TYPE;
 
 
@@ -61,8 +61,7 @@ typedef struct
 
 } FIELD_DATA;
 
-typedef struct
-{
+typedef struct {
     wchar_t name[64];
     wchar_t type[16];
 
@@ -70,7 +69,21 @@ typedef struct
     wchar_t iniSection[64];
     FIELD_DATA fields[16];
     u_int fieldCount;
+
+    bool hasButton;
 } TAB_DATA;
+
+typedef struct {
+    wchar_t name[64];
+    wchar_t text[64];
+
+    u_int x;
+    u_int y;
+    u_int width;
+    u_int height;
+
+    HWND hWnd;
+} BUTTON_DATA;
 
 typedef struct {
     wchar_t label[64];
@@ -79,10 +92,10 @@ typedef struct {
 
 LPCWSTR INI_PATH = L"C:\\watchFolder\\settings.ini";
 
+
+
 #define MAX_TABS 32
 #define MAX_FIELDS 32
-
-
 HWND fieldLabels[MAX_FIELDS];
 HWND fieldControls[MAX_FIELDS];
 int activeFieldCount = 0;
@@ -116,22 +129,6 @@ void DestroyActiveFields(void)
     activeFieldCount = 0;
 }
 
-
-void LoadLabelsFromIni() {
-
-    wchar_t section[16];
-    wchar_t name[64];
-
-    GetPrivateProfileStringW(
-            section,
-            L"Labels",
-            L"Unnamed",
-            name,
-            64,
-            INI_PATH
-        );
-}
-
 u_int LoadTabCount(void)
 {
     return GetPrivateProfileIntW(
@@ -142,7 +139,31 @@ u_int LoadTabCount(void)
     );
 }
 
+bool LoadButtonData(const wchar_t* tabSection, BUTTON_DATA* b)
+{
+    if (!b) return false;
 
+    b->x = GetPrivateProfileIntW(tabSection, L"Button.X", -1, INI_PATH);
+    b->y = GetPrivateProfileIntW(tabSection, L"Button.Y", -1, INI_PATH);
+
+    if (b->x < 0 || b->y < 0)
+        return false;
+
+    b->width  = GetPrivateProfileIntW(tabSection, L"Button.Width", 80, INI_PATH);
+    b->height = GetPrivateProfileIntW(tabSection, L"Button.Height", 25, INI_PATH);
+
+    GetPrivateProfileStringW(
+        tabSection,
+        L"Button.Text",
+        L"Save",
+        b->text,
+        64,
+        INI_PATH
+    );
+
+    wcscpy_s(b->name, 64, L"SaveButton");
+    return true;
+}
 
 
 
@@ -216,7 +237,6 @@ void LoadTabFields(int tabIndex, const wchar_t* section)
 
         if (!_wcsicmp(ctrl, L"EDIT")) field->controlType = FIELD_EDIT;
         else if (!_wcsicmp(ctrl, L"COMBO")) field->controlType = FIELD_COMBO;
-        else if (!_wcsicmp(ctrl, L"CHECKBOX")) field->controlType = FIELD_CHECKBOX;
         else field->controlType = FIELD_LABEL;
 
         swprintf_s(key, 64, L"Field%d.Source", f);
@@ -245,9 +265,6 @@ void LoadTabsFromIni(HWND hTab)
 
         GetPrivateProfileStringW(section, L"Name", L"Unnamed",
             Tabs[i].name, 64, INI_PATH);
-
-        GetPrivateProfileStringW(section, L"Type", L"",
-            Tabs[i].type, 16, INI_PATH);
 
 
 
@@ -347,21 +364,6 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
                 );
                 y += 50;
                 break;
-
-            case FIELD_CHECKBOX:
-                f->hControl = CreateWindowW(
-                    L"BUTTON",
-                    f->label,
-                    WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
-                    xCtrl, y,
-                    drawWidth, drawHeight,
-                    parent,
-                    NULL,
-                    g_hInstance,
-                    NULL
-                );
-                y += 30;
-                break;
             default: ;
         }
 
@@ -380,53 +382,62 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
 }
 
 
+void CreateButtons(HWND parent, int pageIndex) {
+    if (hButton) {
+        DestroyWindow(hButton);
+        hButton = NULL;
+    }
+
+    BUTTON_DATA btn;
+    if (!LoadButtonData(Tabs[pageIndex].iniSection, &btn))
+        return;
+
+    RECT rc;
+    GetClientRect(hPopupTab, &rc);
+    TabCtrl_AdjustRect(hPopupTab, FALSE, &rc);
+
+    int drawX = rc.left + btn.x;
+    int drawY = rc.top  + btn.y;
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-void LoadFromIni(HWND comboBox, LPCWSTR text) {
-    SendMessage(comboBox, CB_RESETCONTENT, 0, 0);
-
-    WCHAR value[64];
-    WCHAR key[8];
-    int index = 1;
-
-    while (1) {
-        swprintf_s(key, 8, L"%d", index);
-        GetPrivateProfileStringW(
-            text,
-            key,
-            L"",
-            value,
-            64,
-            INI_PATH
+    if (LoadButtonData(Tabs[pageIndex].iniSection, &btn)) {
+        hButton = CreateWindowW(
+            L"BUTTON",
+            btn.text,
+            WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP,
+            drawX,
+            drawY,
+            btn.width,
+            btn.height,
+            parent,
+            (HMENU)IDC_SAVE_BUTTON,
+            g_hInstance,
+            NULL
         );
-
-        if (value[0] == L'\0')
-            break;
-
-        SendMessage(comboBox, CB_ADDSTRING, 0, (LPARAM)value);
-        index++;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void MakeUniqueFilename(wchar_t* destPath, const wchar_t* basePath) {
     wcscpy_s(destPath, MAX_PATH, basePath);
@@ -599,6 +610,8 @@ void SetPage(int newPage)
 
     CreateFieldsFromTab(hPopupWnd, &Tabs[newPage]);
 
+    CreateButtons(hPopupWnd, newPage);
+
     TAB_DATA* tab = &Tabs[g_CurrentPage];
 
 
@@ -608,10 +621,16 @@ void SetPage(int newPage)
 }
 
 
-
-
-
-
+void OpenSettings(HWND hwnd) {
+    ShellExecute(
+    hwnd,
+    L"open",
+    L"notepad.exe",
+    INI_PATH,
+    NULL,
+    SW_SHOWNORMAL
+);
+}
 
 
 
@@ -748,17 +767,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     return 0;
 }
 
-void OpenSettings(HWND hwnd) {
-    ShellExecute(
-    hwnd,
-    L"open",
-    L"notepad.exe",
-    INI_PATH,
-    NULL,
-    SW_SHOWNORMAL
-);
-}
-
 LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     int currentPage = g_CurrentPage;
     switch(msg) {
@@ -820,7 +828,7 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 
                     if (!IsFileSendReady(currentPage)) {
-                        MessageBox(hwnd, L"Please fill in all required fields before sending.", L"Warning", MB_OK | MB_ICONWARNING);
+                        MessageBox(hwnd, L"Please fill in all required fields before saving file.", L"Warning", MB_OK | MB_ICONWARNING);
                         break;
                     }
 
@@ -846,29 +854,6 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             DeleteObject(hBrush);
             return 1;
         }
-
-        case WM_CREATE:
-        {
-            hButton = CreateWindow(
-                       L"BUTTON",
-                       L"Save",
-                       WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-                       550,
-                       70,
-                       60,
-                       30,
-                       hwnd,
-                       (HMENU)IDC_SAVE_BUTTON,
-                       (HINSTANCE)GetWindowLongPtr(hwnd, GWLP_HINSTANCE),
-                       NULL);
-
-
-            ShowWindow(hButton, SW_SHOW);
-
-
-
-        }
-            break;
 
         default:
             return DefWindowProc(hwnd, msg, wParam, lParam);
