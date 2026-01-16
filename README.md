@@ -19,7 +19,7 @@ This lightweight WIN32 Application enhances any printer's scanning capabilities.
 
 
 ## Application info:
-- ***Exe file size is about 130 kilobytes.***
+- ***Exe file size is about 140 kilobytes.***
 - ***Runtime RAM usage stays between 10-20 megabytes while open 24/7.***
 - ***The application shows up as a windows tray icon.***
 
