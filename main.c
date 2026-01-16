@@ -49,6 +49,9 @@ typedef struct
     wchar_t sourceName[64];
     wchar_t value[256];
 
+    wchar_t lastComboValue[256];
+    bool userChanged;
+    bool skipRecent;
 
     u_int x;
     int y;
@@ -129,6 +132,50 @@ void DestroyActiveFields(void)
     activeFieldCount = 0;
 }
 
+FIELD_DATA* FindFieldByHwnd(HWND hCtrl) {
+    for (int t = 0; t < PAGE_COUNT; t++) {
+        TAB_DATA* tab = &Tabs[t];
+        for (int f = 0; f < tab->fieldCount; f++) {
+            if (tab->fields[f].hControl == hCtrl)
+                return &tab->fields[f];
+        }
+    }
+    return NULL;
+}
+
+static bool IsInvalidFilenameChar(wchar_t c)
+{
+    if (c < 32) return true;
+
+    switch (c) {
+        case L'<': case L'>': case L':':
+        case L'"': case L'/': case L'\\':
+        case L'|': case L'?': case L'*':
+            return true;
+        default: ;
+    }
+    return false;
+}
+
+void SanitizeFilename(wchar_t* str)
+{
+    if (!str) return;
+
+    for (wchar_t* p = str; *p; ++p) {
+        if (IsInvalidFilenameChar(*p)) {
+            *p = L'-';
+        }
+    }
+
+    size_t len = wcslen(str);
+    while (len > 0 && (str[len - 1] == L' ' || str[len - 1] == L'.')) {
+        str[--len] = L'\0';
+    }
+}
+
+
+
+
 u_int LoadTabCount(void)
 {
     return GetPrivateProfileIntW(
@@ -187,6 +234,18 @@ void PopulateControlData(const FIELD_DATA* f)
         if (!eq) continue;
         SendMessage(f->hControl, CB_ADDSTRING, 0, (LPARAM)(eq + 1));
     }
+
+    if (wcslen(f->lastComboValue) > 0) {
+        int count = (int)SendMessage(f->hControl, CB_GETCOUNT, 0, 0);
+        for (int i = 0; i < count; i++) {
+            wchar_t item[256];
+            SendMessage(f->hControl, CB_GETLBTEXT, i, (LPARAM)item);
+            if (_wcsicmp(item, f->lastComboValue) == 0) {
+                SendMessage(f->hControl, CB_SETCURSEL, i, 0);
+                break;
+            }
+        }
+    }
 }
 
 
@@ -200,6 +259,8 @@ void LoadTabFields(int tabIndex, const wchar_t* section)
 
     tab->fieldCount =
         GetPrivateProfileIntW(section, L"FieldCount", 0, INI_PATH);
+
+
 
     for (int f = 0; f < tab->fieldCount; f++)
     {
@@ -232,7 +293,21 @@ void LoadTabFields(int tabIndex, const wchar_t* section)
         field->height = GetPrivateProfileIntW(section, key, -1, INI_PATH);
 
 
+        swprintf_s(key, 64, L"Field%d.SkipRecent", f);
+        field->skipRecent = GetPrivateProfileIntW(section, key, 0, INI_PATH) != 0;
 
+
+        if (field->controlType == FIELD_COMBO && !field->skipRecent) {
+            swprintf_s(key, 64, L"Field%d.LastValue", f);
+            GetPrivateProfileStringW(
+                section,
+                key,
+                L"",
+                field->lastComboValue,
+                256,
+                INI_PATH
+            );
+        }
 
 
         if (!_wcsicmp(ctrl, L"EDIT")) field->controlType = FIELD_EDIT;
@@ -316,6 +391,9 @@ void CreateFieldsFromTab(HWND parent, TAB_DATA* tab)
         int drawWidth  = (f->width != -1) ? f->width : widthCtrl;
         int drawHeight = (f->height != -1) ? f->height : heightCtrl;
 
+        
+        swprintf_s(key, 64, L"Field%d.SkipRecent", i);
+        f->skipRecent = GetPrivateProfileIntW(tab->iniSection, key, 0, INI_PATH) != 0;
 
 
 
@@ -494,6 +572,27 @@ void SaveFile(int currentPage) {
 
     TAB_DATA* tab = &Tabs[currentPage];
 
+    for (int i = 0; i < tab->fieldCount; i++) {
+        FIELD_DATA* f = &tab->fields[i];
+        if (f->controlType == FIELD_COMBO) {
+            int sel = (int)SendMessage(f->hControl, CB_GETCURSEL, 0, 0);
+            if (sel != CB_ERR) {
+                SendMessage(f->hControl, CB_GETLBTEXT, sel, (LPARAM)f->lastComboValue);
+
+                int fieldIndex = (int)(f - &Tabs[g_CurrentPage].fields[0]);
+                wchar_t key[64];
+                swprintf_s(key, 64, L"Field%d.LastValue", fieldIndex);
+                WritePrivateProfileStringW(
+                    Tabs[g_CurrentPage].iniSection,
+                    key,
+                    f->lastComboValue,
+                    INI_PATH
+                );
+            }
+        }
+    }
+
+
     FIELD_VALUE fieldValues[64];
     int fieldCount = 0;
     for (int i = 0; i < tab->fieldCount; i++) {
@@ -519,6 +618,7 @@ void SaveFile(int currentPage) {
         return;
     }
     ExpandTemplate(filePattern, finalFile, 256, fieldValues, fieldCount);
+    SanitizeFilename(finalFile);
 
     for (int pnum = 1; pnum <= 10; pnum++) {
         wchar_t pathKey[32], folderTemplate[512], expandedFolder[512];
@@ -527,6 +627,7 @@ void SaveFile(int currentPage) {
         if (folderTemplate[0] == 0) break;
 
         ExpandTemplate(folderTemplate, expandedFolder, 512, fieldValues, fieldCount);
+
 
         if (expandedFolder[wcslen(expandedFolder) - 1] != L'\\')
             wcscat_s(expandedFolder, 512, L"\\");
@@ -543,6 +644,7 @@ void SaveFile(int currentPage) {
 
         wchar_t fullPath[MAX_PATH];
         swprintf_s(fullPath, MAX_PATH, L"%s%s", expandedFolder, finalFile);
+
         MakeUniqueFilename(fullPath, fullPath);
 
         if (!CopyFileW(oldFile, fullPath, FALSE)) {
@@ -824,6 +926,30 @@ LRESULT CALLBACK PopupWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             break;
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
+            case CBN_SELCHANGE: {
+                FIELD_DATA* f = FindFieldByHwnd((HWND)lParam);
+                if (f && f->controlType == FIELD_COMBO && !f->skipRecent) {
+                    int sel = (int)SendMessage(f->hControl, CB_GETCURSEL, 0, 0);
+                    if (sel != CB_ERR) {
+                        SendMessage(f->hControl, CB_GETLBTEXT, sel, (LPARAM)f->lastComboValue);
+                        f->userChanged = TRUE;
+
+                        int fieldIndex = (int)(f - &Tabs[g_CurrentPage].fields[0]);
+
+                        wchar_t key[64];
+                        swprintf_s(key, 64, L"Field%d.LastValue", fieldIndex);
+                        WritePrivateProfileStringW(
+                            Tabs[g_CurrentPage].iniSection,
+                            key,
+                            f->lastComboValue,
+                            INI_PATH
+                        );
+                    }
+                }
+
+                break;
+            }
+
                 case IDC_SAVE_BUTTON:
 
 
