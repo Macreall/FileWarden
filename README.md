@@ -10,6 +10,10 @@ FileWarden is a native Windows application written in **C using the Win32 API**.
 
 Designed for businesses that process hundreds or thousands of documents, FileWarden eliminates repetitive manual organization while keeping system resource usage extremely low.
 
+### *Why C?*
+---
+Built entirely in native C to ensure zero external dependencies, a minimal footprint, applicable on any windows machine, and instant execution upon file system events.
+
 ---
 
 ## Features
@@ -84,7 +88,7 @@ The result is a significantly faster and more organized document management proc
 **Architecture**
 
 * Event-driven Windows application
-* File system monitoring
+* Asynchronous file system monitoring
 * Windows system tray integration
 
 ---
